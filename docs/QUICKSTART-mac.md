@@ -1,0 +1,36 @@
+# QUICKSTART (macOS)
+
+## 前置
+- 已安装 Node（推荐 nvm）
+- 可选：Chrome for Testing（若无则使用系统 Chrome 或 Playwright 自带）
+- 相关 CLI（codex/gemini/iflow/claude/droid）已安装或允许稍后手动安装
+
+## 一次安装
+```
+cd mcp-local-manager
+bash scripts/install-mac.sh
+```
+- 脚本会：
+  - 体检 macOS 路径（VS Code/Insiders、Cursor、Node、Chrome）
+  - 生成 `~/.mcp-central/config/mcp-servers.json`
+  - 执行同步（只改 MCP 段，Claude 命令兜底）
+  - 运行健康检查并输出结论
+
+## 每次修改 MCP 清单后
+```
+bash scripts/mcp-sync.sh
+bash scripts/mcp-check.sh
+```
+
+## 统一来源位置
+- `~/.mcp-central/config/mcp-servers.json`
+
+## 目标落地（只改 MCP）
+- Codex: `~/.codex/config.toml` `[mcp_servers.*]` + `*.env`
+- Gemini: `~/.gemini/settings.json` `mcpServers` + `mcp.allowed`
+- iFlow: `~/.iflow/settings.json` `mcpServers`
+- Claude: `~/.claude/settings.json` `mcpServers` + 命令兜底
+- Droid: `~/.factory/mcp.json` `mcpServers`
+- Cursor: `~/.cursor/mcp.json` `mcpServers`
+- VS Code: `~/Library/Application Support/Code/User/mcp.json` 顶层 `servers`
+

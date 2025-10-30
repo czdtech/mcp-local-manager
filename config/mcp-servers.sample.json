@@ -1,0 +1,61 @@
+{
+  "version": "1.1.0",
+  "description": "示例：统一 MCP Server 配置（复制到 ~/.mcp-central/config/mcp-servers.json 后按需修改）",
+  "servers": {
+    "chrome-devtools": {
+      "enabled": true,
+      "type": "local",
+      "command": "/path/to/chrome-devtools-mcp",
+      "args": ["--isolated","--headless","--executablePath","/path/to/chrome","--logFile","~/.mcp-central/logs/chrome-devtools.log"],
+      "env": {
+        "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin",
+        "npm_config_prefix": "~/.nvm/versions/node",
+        "CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX": "1",
+        "CHROME_DEVTOOLS_MCP_EXTRA_ARGS": "--disable-dev-shm-usage --disable-gpu"
+      }
+    },
+    "sequential-thinking": {
+      "enabled": true,
+      "type": "local",
+      "command": "/path/to/mcp-server-sequential-thinking",
+      "args": [],
+      "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "~/.nvm/versions/node" }
+    },
+    "playwright": {
+      "enabled": true,
+      "type": "local",
+      "command": "/path/to/mcp-server-playwright",
+      "args": ["--headless","--isolated","--no-sandbox","--output-dir","~/.mcp-central/logs/playwright","--executable-path","/path/to/chrome"],
+      "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin" }
+    },
+    "serena": {
+      "enabled": true,
+      "type": "local",
+      "command": "~/.local/bin/serena",
+      "args": ["start-mcp-server","--context","desktop-app","--enable-web-dashboard","false","--enable-gui-log-window","false"],
+      "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin" }
+    },
+    "filesystem": {
+      "enabled": true,
+      "type": "local",
+      "command": "/path/to/mcp-server-filesystem",
+      "args": ["~/work","~/.mcp-central"],
+      "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin" }
+    },
+    "codex-cli": {
+      "enabled": true,
+      "type": "local",
+      "command": "/path/to/codex-mcp",
+      "args": [],
+      "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "~/.nvm/versions/node" }
+    },
+    "context7": {
+      "enabled": true,
+      "type": "local",
+      "command": "/path/to/context7-mcp",
+      "args": [],
+      "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "~/.nvm/versions/node" }
+    }
+  }
+}
+
