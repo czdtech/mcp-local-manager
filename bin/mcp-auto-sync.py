@@ -10,6 +10,11 @@ MCP Auto Sync (macOS/Linux)
 - Cursor:  ~/.cursor/mcp.json                mcpServers
 - VS Code: macOS ~/Library/Application Support/Code*/User/mcp.json 顶层 servers
           Linux ~/.config/Code*/User/mcp.json 顶层 servers
+
+与最新 ~/.mcp-central 对齐：
+- 不使用 wrappers；chrome-devtools 采用 npx 固定版本（推荐 0.9.0）。
+- Claude 命令兜底时，环境变量必须位于 name 与 "--" 之间：
+  claude mcp add --transport stdio <name> -e KEY=VAL ... -- <command> <args>
 """
 
 import json, os, re, shutil, subprocess, sys, platform
@@ -69,11 +74,16 @@ def sync_codex():
             for k,v in env.items():
                 lines.append(f"{k} = \"{v}\"")
     new_block = '\n'.join(lines)
-    pattern = r"\n*# === MCP Servers 配置（由 MCP Local Manager 生成）===\n(?:.|\n)*?(?=\n?# ===|\Z)"
-    if re.search(pattern, content):
-        content = re.sub(pattern, new_block, content)
-    else:
-        content = content.rstrip()+"\n"+new_block+"\n"
+    # 1) 移除所有旧的 MCP 标记块（Local Manager / Central）
+    for pat in [
+        r"\n*# === MCP Servers 配置（由 MCP Local Manager 生成）===\n(?:.|\n)*?(?=\n?# ===|\Z)",
+        r"\n*# === MCP Servers 配置（由 MCP Central 生成）===\n(?:.|\n)*?(?=\n?# ===|\Z)"
+    ]:
+        content = re.sub(pat, "\n", content)
+    # 2) 保险起见：清理所有 [mcp_servers.*] 段
+    content = re.sub(r"(?ms)^\[mcp_servers\.[^\]]+\][\s\S]*?(?=^\[|\Z)", "", content)
+    # 3) 追加一次新的块
+    content = content.rstrip()+"\n"+new_block+"\n"
     p.write_text(content, encoding='utf-8')
     log_ok(f'Codex 配置已更新: {p}')
     return True
@@ -169,7 +179,11 @@ def sync_claude_cmd():
     ok = True
     for name in missing:
         info = SERVERS[name]
-        cmd = ['claude','mcp','add','--transport','stdio', name, '--', info.get('command','')]
+        cmd = ['claude','mcp','add','--transport','stdio', name]
+        # 环境变量必须在 name 与 -- 之间
+        for k,v in (info.get('env') or {}).items():
+            cmd.extend(['-e', f'{k}={v}'])
+        cmd += ['--', info.get('command','')]
         cmd += info.get('args', [])
         try:
             subprocess.run(cmd, check=False, timeout=15)
@@ -241,4 +255,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

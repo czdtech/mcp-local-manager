@@ -57,8 +57,8 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
     "chrome-devtools": {
       "enabled": true,
       "type": "local",
-      "command": "$NODE_BIN/chrome-devtools-mcp",
-      "args": ["--isolated","--headless","--executablePath","${CHROME_EXEC}","--logFile","$LOG_DIR/chrome-devtools.log"],
+      "command": "npx",
+      "args": ["-y","chrome-devtools-mcp@0.9.0"],
       "env": {
         "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin",
         "npm_config_prefix": "${HOME}/.nvm/versions/node",
@@ -118,4 +118,3 @@ python3 "$DIR/bin/mcp-auto-sync.py" sync
 bash "$DIR/scripts/mcp-check.sh"
 
 echo "完成。若结论为 OK，则可开始使用；若为 WARN/FAIL，请按提示项逐一处理。"
-

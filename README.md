@@ -1,11 +1,27 @@
 # MCP Local Manager
 
+![安装](https://img.shields.io/badge/%E5%AE%89%E8%A3%85-install--mac.sh-2ea44f?logo=gnubash&logoColor=white)
+![同步](https://img.shields.io/badge/%E5%90%8C%E6%AD%A5-mcp--sync.sh-2ea44f?logo=gnubash&logoColor=white)
+![体检](https://img.shields.io/badge/%E4%BD%93%E6%A3%80-mcp--check.sh-2ea44f?logo=gnubash&logoColor=white)
+
+快速使用
+```
+bash scripts/install-mac.sh   # 首次安装：体检→渲染→同步→体检
+bash scripts/mcp-sync.sh      # 日常一键同步（只改 MCP 段）
+bash scripts/mcp-check.sh     # 只读健康检查
+```
+
 用途：在 macOS 与 Linux 上以“单一来源”管理所有 CLI/编辑器的 MCP 服务器配置，做到一次修改、处处生效；并提供一键同步与只读健康检查。
 
 核心理念：
 - 统一来源：`~/.mcp-central/config/mcp-servers.json`
 - 仅改 MCP 段：不同目标只写入各自 MCP 部分（如 Codex 的 `[mcp_servers.*]`、Gemini 的 `mcpServers` 等），不触碰其它设置
 - Claude：文件为主（`~/.claude/settings.json`），命令兜底仅补“缺失项”
+
+与最新方案对齐：
+- 不使用 wrappers；所有 server 直连二进制或官方推荐方式。
+- Chrome DevTools MCP 使用 npx，且固定版本（默认 0.9.0）以确保稳定：
+  `command: "npx"`, `args: ["-y","chrome-devtools-mcp@0.9.0"]`
 
 ## 目录
 
@@ -22,6 +38,10 @@ mcp-local-manager/
 └─ docs/
    └─ QUICKSTART-mac.md       # macOS 快速开始
 ```
+
+## 架构图
+
+![MCP 架构图](docs/mcp-architecture.png)
 
 ## 快速上手
 
@@ -53,6 +73,13 @@ bash scripts/mcp-check.sh  # 只读健康检查
            macOS Insiders `~/Library/Application Support/Code - Insiders/User/mcp.json`
            Linux `~/.config/Code/User/mcp.json` 与 `~/.config/Code - Insiders/User/mcp.json`
 
+附注（Claude 命令兜底语法）：
+```
+claude mcp add --transport stdio <name> \
+  -e KEY1=VALUE1 -e KEY2=VALUE2 -- <command> <args>
+```
+注意 `-e` 必须位于 name 与 `--` 之间。
+
 ## 已有配置不一致怎么办？（安全迁移）
 
 - 只改 MCP：本项目所有脚本都“仅替换 MCP 配置段”，不会触碰其它设置。
@@ -65,4 +92,3 @@ bash scripts/mcp-check.sh  # 只读健康检查
 - 去重提示：
   - Cursor 建议只保留 `~/.cursor/mcp.json`，避免把 `mcpServers` 放在 `~/.config/cursor/User/settings.json` 造成重复展示。
   - VS Code 使用 `mcp.json`（顶层 `servers`），不要把清单放入 `settings.json`。
-

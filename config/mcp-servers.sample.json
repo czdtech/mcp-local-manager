@@ -5,8 +5,8 @@
     "chrome-devtools": {
       "enabled": true,
       "type": "local",
-      "command": "/path/to/chrome-devtools-mcp",
-      "args": ["--isolated","--headless","--executablePath","/path/to/chrome","--logFile","~/.mcp-central/logs/chrome-devtools.log"],
+      "command": "npx",
+      "args": ["-y","chrome-devtools-mcp@0.9.0"],
       "env": {
         "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin",
         "npm_config_prefix": "~/.nvm/versions/node",
@@ -58,4 +58,3 @@
     }
   }
 }
-
