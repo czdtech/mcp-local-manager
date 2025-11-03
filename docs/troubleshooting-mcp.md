@@ -4,18 +4,24 @@
 
 ---
 
-## 一、单一来源与体检
+## 一、单一来源与体检（新增 mcpctl 工作流）
 
 - 单一来源
   - 路径：`~/.mcp-central/config/mcp-servers.json`
   - 作用：所有客户端配置均由此渲染“仅 MCP 段”，不会触碰其它设置。
 - 安装与同步
-  - 首次安装（macOS）：`bash scripts/install-mac.sh`
-  - 修改清单后：`bash scripts/mcp-sync.sh` → `bash scripts/mcp-check.sh`
+  - 首次安装（macOS/Linux）：`bash scripts/install-mac.sh`
+  - 推荐日常：使用 `mcpctl` 按需落地而非全量同步：
+    - 查看某客户端集合：`mcpctl status codex` / `mcpctl status claude`
+    - 仅对某个 CLI 下发：`mcpctl apply-cli --client claude --servers context7,serena`
+    - 下发后直接启动：`mcpctl run --client claude --servers context7,serena -- claude`
+    - IDE 全量写入（VS Code/Cursor）：`mcpctl ide-all`
+  - 仍可使用脚本：`bash scripts/mcp-sync.sh` → `bash scripts/mcp-check.sh`
   - 每次落地前，脚本会生成时间戳备份（`*.YYYYMMDD_HHMMSS.backup`）。
 - 体检脚本改进点（已内置在本仓库）
   - Codex TOML 兼容：缺少 Python 3.11 的 `tomllib` 时，使用轻量解析器回退，仅读取 `[mcp_servers.*]` 与 `.env` 段。
-  - Claude 注册表解析：自动适配 `claude mcp list` 输出（无 `--json` 也能解析），且延长超时，减少误报。
+  - Claude 注册表解析：自动适配 `claude mcp list` 输出（无 `--json` 也能解析），且延长超时，减少误报；当文件端已完整覆盖时，不再因注册表缺项告警。
+  - 默认全部启用：中央清单未显式 `enabled: false` 的服务均视为启用；是否真正“加载”，由你对目标 CLI/IDE 的落地决定。
 
 ---
 
@@ -114,7 +120,7 @@
 
 ---
 
-## 五、常见坑与修复
+## 五、常见坑与修复（含 mcpctl 提示）
 
 - `unknown option '-y'`（droid）：未使用 `--` 分隔，`-y` 被 droid 自身解析。
 - `No module named 'tomllib'`：体检脚本已内置回退；或升级到 Python 3.11+。
@@ -122,6 +128,8 @@
 - VS Code/Kilo/Cursor 不生效：路径写错或放入 `settings.json`；改为其 MCP 专用文件。
 - 名称重复/大小写不一致：统一成小写-连字符；清理历史注册项（Claude/Droid）。
 - PATH/二进制差异：必要时在 `env.PATH` 显式包含 Node bin 与系统路径；优先绝对路径。
+- 只想查看单一客户端状态：用 `mcpctl status codex|claude|vscode|cursor`，而不是读中央清单。
+- 启动前只加载少量 MCP：用 `mcpctl run --client <cli> --servers <list> -- <启动命令>`。
 
 ---
 
@@ -192,4 +200,3 @@ droid mcp add --type stdio playwright -- \
 ***
 
 最后更新：以实际脚本为准（`scripts/install-mac.sh`、`scripts/mcp-sync.sh`、`scripts/mcp-check.sh`）。
-

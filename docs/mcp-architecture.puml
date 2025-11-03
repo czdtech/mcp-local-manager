@@ -6,6 +6,8 @@ rectangle "~/.mcp-central/config/mcp-servers.json" as CENTRAL
 rectangle "mcp-auto-sync.py\n(~/.mcp-central/bin)" as SYNC
 
 CENTRAL -down-> SYNC : 单一来源
+CENTRAL -right-> MCPCTL : 按客户端落地
+rectangle "mcpctl\nstatus/apply-cli/run/ide-all" as MCPCTL
 
 package "目标配置 (仅写 MCP 段)" {
   rectangle "Codex\n~/.codex/config.toml\n[mcp_servers.*]" as CODEX
@@ -24,6 +26,13 @@ SYNC -down-> CLAUDE_FILE
 SYNC -down-> CURSOR
 SYNC -down-> VSCODE
 SYNC -down-> DROID
+MCPCTL -down-> CODEX
+MCPCTL -down-> GEMINI
+MCPCTL -down-> IFLOW
+MCPCTL -down-> CLAUDE_FILE
+MCPCTL -down-> CURSOR
+MCPCTL -down-> VSCODE
+MCPCTL -down-> DROID
 
 rectangle "Claude(注册表)\nclaude mcp add/remove\n(~/.claude.json 项目作用域)" as CLAUDE_REG
 SYNC -right-> CLAUDE_REG : 兜底注册
@@ -72,4 +81,3 @@ note right of CLAUDE_REG
 end note
 
 @enduml
-

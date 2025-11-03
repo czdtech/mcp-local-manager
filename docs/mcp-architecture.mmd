@@ -1,5 +1,6 @@
 flowchart TD
   CENTRAL["~/.mcp-central/config/mcp-servers.json"] --> SYNC["mcp-auto-sync.py\n(~/.mcp-central/bin)"]
+  CENTRAL --> MCPCTL["mcpctl\n按客户端落地\nstatus/apply-cli/run/ide-all"]
 
   subgraph Targets[目标配置 (仅写 MCP 段)]
     CODEX["Codex\n~/.codex/config.toml\n[mcp_servers.*]"]
@@ -18,6 +19,13 @@ flowchart TD
   SYNC --> CURSOR
   SYNC --> VSCODE
   SYNC --> DROID
+  MCPCTL --> CODEX
+  MCPCTL --> GEMINI
+  MCPCTL --> IFLOW
+  MCPCTL --> CLAUDE_FILE
+  MCPCTL --> CURSOR
+  MCPCTL --> VSCODE
+  MCPCTL --> DROID
 
   CLAUDE_REG["Claude(注册表)\nclaude mcp add/remove\n(~/.claude.json 项目作用域)"]
   SYNC -. 兜底注册 .-> CLAUDE_REG
@@ -51,4 +59,3 @@ flowchart TD
 
   CDT_LOCAL["可选(默认禁用)\nchrome-devtools-local\n--browserUrl http://127.0.0.1:9222"]
   RUNTIME -.-> CDT_LOCAL
-
