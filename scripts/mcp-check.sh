@@ -43,7 +43,7 @@ def load_central():
         return {}
     servers = {}
     for name, info in (obj.get('servers') or {}).items():
-        if not info.get('enabled', False):
+        if not info.get('enabled', True):
             continue
         servers[name] = info
     if not servers:
@@ -66,9 +66,21 @@ def cmp(center, target, scope):
         add(WARN, scope, f'command 不一致: central={c_cmd} != target={t_cmd}')
     if list(c_args) != list(t_args):
         add(WARN, scope, f'args 不一致: central={c_args} != target={t_args}')
-    miss_env = [k for k in c_env if k not in (t_env or {})]
-    if miss_env:
-        add(WARN, scope, f'env 缺失: {miss_env}')
+    # env 对比策略：
+    # - 仅在“必要键”缺失时告警（如 *_API_KEY）。
+    # - 对 PATH、npm_config_prefix 等可推导/非关键键不告警。
+    # - 对经过“env 精简”的目标（如 gemini/iflow/claude/droid/cursor/vscode）忽略 env 对比。
+    scope_prefix = (scope.split(':', 1)[0] if ':' in scope else scope).lower()
+    non_strict_targets = {
+        'gemini', 'iflow', 'claude(file)', 'droid', 'cursor', 'vscode(user)', 'vscode(insiders)'
+    }
+    if scope_prefix in non_strict_targets:
+        return
+    critical = [k for k in (c_env or {}) if (k.upper().endswith('_API_KEY'))]
+    if critical:
+        miss_env = [k for k in critical if k not in (t_env or {})]
+        if miss_env:
+            add(WARN, scope, f'env 关键键缺失: {miss_env}')
 
 def parse_codex_toml_text(text: str):
     """最小 TOML 解析：仅提取 [mcp_servers.*] 与其 .env 的 command/args/env，用于体检。
@@ -139,12 +151,9 @@ try:
             for n, t in mcp.items():
                 if n.endswith('.env'):
                     continue
-                env = mcp.get(f'{n}.env', {}) if isinstance(mcp, dict) else {}
-                parsed[n] = {
-                    'command': (t or {}).get('command'),
-                    'args': (t or {}).get('args', []),
-                    'env': env or {}
-                }
+                # tomllib 会把 [mcp_servers.NAME.env] 解析为 t['env']
+                env = (t or {}).get('env', {}) if isinstance(t, dict) else {}
+                parsed[n] = {'command': (t or {}).get('command'), 'args': (t or {}).get('args', []), 'env': env or {}}
         except Exception:
             parsed = parse_codex_toml_text(text)
 
@@ -205,9 +214,22 @@ def claude_registered_names():
     except Exception:
         return set()
 
+def claude_file_names():
+    obj = load_json(HOME/'.claude'/'settings.json') or {}
+    m = obj.get('mcpServers') if isinstance(obj, dict) else {}
+    return set(m.keys()) if isinstance(m, dict) else set()
+
 reg = claude_registered_names()
 miss = sorted(central_names - reg)
-add(OK if not miss else WARN, 'claude(registered)', f'缺少已注册={miss or "无"}')
+if miss:
+    # 如果文件端已经完整覆盖，则降级为 OK（注册表缺失不阻塞使用）
+    file_cov = claude_file_names()
+    if central_names.issubset(file_cov):
+        add(OK, 'claude(registered)', '已由文件覆盖（注册表缺少可忽略）')
+    else:
+        add(WARN, 'claude(registered)', f'缺少已注册={miss or "无"}')
+else:
+    add(OK, 'claude(registered)', '缺少已注册=无')
 
 # 汇总
 rank = {OK:0, WARN:1, FAIL:2}

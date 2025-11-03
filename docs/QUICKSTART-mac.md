@@ -16,16 +16,26 @@ bash scripts/install-mac.sh
   - 执行同步（只改 MCP 段，Claude 命令兜底）
   - 运行健康检查并输出结论
 
-## 每次修改 MCP 清单后
+## 每次启动 CLI/IDE 前（推荐）
+优先用 mcpctl 按需下发，避免一次性加载全部服务：
 ```
-bash scripts/mcp-sync.sh
-bash scripts/mcp-check.sh
+# 例：Claude 只启用 context7+serena
+mcpctl run --client claude --servers context7,serena -- claude
+
+# 或者仅下发不启动：
+mcpctl apply-cli --client claude --servers context7,serena
+
+# IDE（VS Code/Cursor）全量写入，具体开关在 IDE 内操作：
+mcpctl ide-all
+
+# 查看当前集合：
+mcpctl status codex   # 或 claude/vscode/cursor
 ```
 
 ## 统一来源位置
 - `~/.mcp-central/config/mcp-servers.json`
 
-## 目标落地（只改 MCP）
+## 目标落地（只改 MCP；默认全部启用，除非显式 `enabled: false`）
 - Codex: `~/.codex/config.toml` `[mcp_servers.*]` + `*.env`
 - Gemini: `~/.gemini/settings.json` `mcpServers` + `mcp.allowed`
 - iFlow: `~/.iflow/settings.json` `mcpServers`
@@ -33,4 +43,3 @@ bash scripts/mcp-check.sh
 - Droid: `~/.factory/mcp.json` `mcpServers`
 - Cursor: `~/.cursor/mcp.json` `mcpServers`
 - VS Code: `~/Library/Application Support/Code/User/mcp.json` 顶层 `servers`
-

@@ -61,7 +61,7 @@ def sync_codex():
     content = p.read_text(encoding='utf-8')
     lines = ["\n# === MCP Servers 配置（由 MCP Local Manager 生成）==="]
     for name,info in SERVERS.items():
-        if not info.get('enabled', False):
+        if not info.get('enabled', True):
             continue
         lines.append(f"\n[mcp_servers.{name}]")
         lines.append(f"command = \"{info.get('command','')}\"")
@@ -97,7 +97,7 @@ def write_json(path: Path, obj: dict):
 def build_mcpServers():
     out = {}
     for name,info in SERVERS.items():
-        if not info.get('enabled', False):
+        if not info.get('enabled', True):
             continue
         entry = {}
         for k in ('command','args','env','url','headers','type'):
@@ -173,7 +173,7 @@ def claude_registered():
         return set()
 
 def sync_claude_cmd():
-    want = {k for k,v in SERVERS.items() if v.get('enabled',False)}
+    want = {k for k,v in SERVERS.items() if v.get('enabled', True)}
     have = claude_registered()
     missing = sorted(want - have)
     ok = True

@@ -1,0 +1,397 @@
+#!/usr/bin/env python3
+# mcpctl: 轻量命令行，用于按需启用/禁用 MCP 服务器、应用配置集(profile)，
+#         并将所选集合落地到指定 CLI/IDE（不再提供 nvm 相关切换）。
+
+import argparse, json, os, re, shutil, subprocess, sys
+from pathlib import Path
+
+HOME = Path.home()
+CENTRAL = HOME/'.mcp-central'/'config'/'mcp-servers.json'
+
+def load_json(p: Path, default):
+    if not p.exists():
+        return default
+    try:
+        return json.loads(p.read_text(encoding='utf-8'))
+    except Exception:
+        return default
+
+def save_json(p: Path, obj: dict):
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding='utf-8')
+
+def backup(p: Path):
+    if not p.exists():
+        return None
+    ts = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
+    b = p.with_suffix(f'.{ts}.backup')
+    shutil.copy2(p, b)
+    return b
+
+def load_central_servers():
+    obj = load_json(CENTRAL, {})
+    servers = obj.get('servers') or {}
+    return obj, servers
+
+def write_central_servers(obj):
+    backup(CENTRAL)
+    save_json(CENTRAL, obj)
+
+# 注：已移除 nvm 与中央清单开关控制逻辑
+
+def list_servers():
+    obj, servers = load_central_servers()
+    rows = []
+    for n, v in sorted(servers.items()):
+        en = bool(v.get('enabled', True))
+        cmd = v.get('command','')
+        rows.append((n, 'on' if en else 'off', cmd))
+    print("中央清单（启用开关与命令路径）")
+    print("name                        state  command")
+    print("-"*60)
+    for n,st,cmd in rows:
+        print(f"{n:26} {st:5}  {cmd}")
+
+def _json_keys(path: Path, pref_key='mcpServers'):
+    obj = load_json(path, {})
+    if isinstance(obj.get(pref_key), dict):
+        return set(obj[pref_key].keys())
+    if isinstance(obj.get('servers'), dict):
+        return set(obj['servers'].keys())
+    return set()
+
+def _codex_keys():
+    p = HOME/'.codex'/'config.toml'
+    if not p.exists():
+        return set()
+    try:
+        import tomllib
+        conf = tomllib.loads(p.read_text(encoding='utf-8'))
+        m = conf.get('mcp_servers', {}) or {}
+        return {k for k in m.keys() if not k.endswith('.env')}
+    except Exception:
+        # 简易回退：正则提取 [mcp_servers.NAME] 段
+        import re
+        names = set()
+        for line in p.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            m = re.match(r"^\[mcp_servers\.([^\]]+)\]$", line)
+            if m:
+                name = m.group(1)
+                if not name.endswith('.env'):
+                    names.add(name)
+        return names
+
+def _claude_registered():
+    try:
+        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=8)
+        reg = set()
+        for line in (out.stdout or '').splitlines():
+            if ':' in line:
+                reg.add(line.split(':',1)[0].strip())
+        return reg
+    except Exception:
+        return set()
+
+def _print_client(label, present, universe):
+    present = sorted(present)
+    absent = sorted(set(universe) - set(present))
+    print(f"\n[{label}]")
+    print("  on : "+ (', '.join(present) if present else '无'))
+    print("  off: "+ (', '.join(absent) if absent else '无'))
+
+def _normalize_client(alias: str|None):
+    if not alias:
+        return None
+    a = alias.strip().lower()
+    mapping = {
+        'claude': 'claude-file',
+        'claude-file': 'claude-file',
+        'claude-reg': 'claude-reg',
+        'codex': 'codex',
+        'gemini': 'gemini',
+        'iflow': 'iflow',
+        'droid': 'droid',
+        'cursor': 'cursor',
+        'vscode': 'vscode-user',
+        'vscode-user': 'vscode-user',
+        'vscode-insiders': 'vscode-ins',
+        'vscode-ins': 'vscode-ins',
+        'insiders': 'vscode-ins',
+    }
+    return mapping.get(a)
+
+def cmd_status(args):
+    obj, servers = load_central_servers()
+    central_names = sorted(servers.keys())
+    # 可选显示中央清单
+    if args.central:
+        list_servers()
+    # 客户端/IDE 视图（可选过滤）
+    # 允许位置参数 client_pos 或 --client；并支持简写别名
+    sel = _normalize_client(getattr(args, 'client_pos', None)) or _normalize_client(args.client)
+    targets = [
+        ('claude-file', 'Claude(file)', lambda: _json_keys(HOME/'.claude'/'settings.json', 'mcpServers')),
+        ('claude-reg',  'Claude(register)', _claude_registered),
+        ('codex',       'Codex', _codex_keys),
+        ('gemini',      'Gemini', lambda: _json_keys(HOME/'.gemini'/'settings.json', 'mcpServers')),
+        ('iflow',       'iFlow', lambda: _json_keys(HOME/'.iflow'/'settings.json', 'mcpServers')),
+        ('droid',       'Droid', lambda: _json_keys(HOME/'.factory'/'mcp.json', 'mcpServers')),
+        ('cursor',      'Cursor', lambda: _json_keys(HOME/'.cursor'/'mcp.json', 'mcpServers')),
+        ('vscode-user', 'VS Code(User)', lambda: _json_keys(HOME/'.config'/'Code'/'User'/'mcp.json', 'servers')),
+        ('vscode-ins',  'VS Code(Insiders)', lambda: _json_keys(HOME/'.config'/'Code - Insiders'/'User'/'mcp.json', 'servers')),
+    ]
+    print("— 按客户端/IDE 的实际启用视图 —")
+    for key, label, fn in targets:
+        if sel and sel != key:
+            continue
+        try:
+            present = fn()
+        except Exception:
+            present = set()
+        _print_client(label, present, central_names)
+
+def ide_clients():
+    return ['cursor','vscode-user','vscode-ins']
+
+def cmd_ide_all(args):
+    obj, servers = load_central_servers()
+    subset = {n: servers[n] for n in servers.keys()}  # 忽略 enabled，全部写入
+    # Cursor + VS Code(User/Insiders)
+    apply_json_map('Cursor', HOME/'.cursor'/'mcp.json', subset, 'mcpServers')
+    apply_json_map('VS Code(User)', HOME/'.config'/'Code'/'User'/'mcp.json', subset, 'servers')
+    apply_json_map('VS Code(Insiders)', HOME/'.config'/'Code - Insiders'/'User'/'mcp.json', subset, 'servers')
+    print('[OK] 已将全部 MCP 写入 IDE（Cursor/VS Code）')
+    return 0
+
+def cmd_run(args):
+    # 先应用到指定客户端
+    rc = cmd_apply_cli(argparse.Namespace(client=args.client, servers=args.servers))
+    if isinstance(rc, int) and rc != 0:
+        return rc
+    # 执行命令
+    exec_cmd = args.exec or []
+    while exec_cmd and exec_cmd[0] == '--':
+        exec_cmd.pop(0)
+    if not exec_cmd:
+        # 默认映射：claude -> ['claude']
+        if args.client.startswith('claude'):
+            exec_cmd = ['claude']
+        elif args.client == 'codex':
+            exec_cmd = ['codex']
+    if not exec_cmd:
+        print('[OK] 已应用所选集合；未提供启动命令，结束。')
+        return 0
+    os.execvp(exec_cmd[0], exec_cmd)
+
+## 已移除：cmd_on/cmd_off/cmd_only（中央清单开关不再作为入口）
+
+## 已移除：cmd_enable_all（默认视为全部启用）
+
+ 
+
+def cmd_nvm_use(args):
+    obj, servers = load_central_servers()
+    targets = args.names or [n for n,v in servers.items() if v.get('enabled', False)]
+    apply_node_version(servers, args.version, targets)
+    write_central_servers(obj)
+    print(f"[OK] 已切换 nvm 版本 {args.version} 于: {', '.join(targets)}")
+
+def cmd_sync(args):
+    here = Path(__file__).resolve().parent.parent
+    sync_py = here/'bin'/'mcp-auto-sync.py'
+    rc = subprocess.call([sys.executable, str(sync_py), 'sync'])
+    sys.exit(rc)
+
+def cmd_check(args):
+    here = Path(__file__).resolve().parent.parent
+    script = here/'scripts'/'mcp-check.sh'
+    rc = subprocess.call(['bash', str(script)])
+    sys.exit(rc)
+
+def build_subset(names):
+    obj, servers = load_central_servers()
+    sel = {}
+    for n in names:
+        if n in servers:
+            sel[n] = servers[n]
+    return sel
+
+def apply_codex(subset):
+    p = HOME/'.codex'/'config.toml'
+    if not p.exists():
+        print(f"[ERR] Codex 配置不存在: {p}")
+        return 1
+    backup(p)
+    text = p.read_text(encoding='utf-8')
+    # 清理旧块 + 所有 [mcp_servers.*]
+    text = re.sub(r"\n*# === MCP Servers 配置（由 MCP (?:Local Manager|Central) 生成）===\n(?:.|\n)*?(?=\n?# ===|\Z)", "\n", text)
+    text = re.sub(r"(?ms)^\[mcp_servers\.[^\]]+\][\s\S]*?(?=^\[|\Z)", "", text)
+    lines = ["\n# === MCP Servers 配置（由 MCP Local Manager 生成）==="]
+    for name,info in subset.items():
+        lines.append(f"\n[mcp_servers.{name}]")
+        lines.append(f"command = \"{info.get('command','')}\"")
+        args = info.get('args') or []
+        if args:
+            lines.append('args = ' + json.dumps(args))
+        env = info.get('env') or {}
+        if env:
+            lines.append(f"\n[mcp_servers.{name}.env]")
+            for k,v in env.items():
+                lines.append(f"{k} = \"{v}\"")
+    new_block='\n'.join(lines)+"\n"
+    p.write_text(text.rstrip()+"\n"+new_block, encoding='utf-8')
+    print(f"[OK] 已应用到 Codex: {p}")
+    return 0
+
+def apply_json_map(label, path: Path, subset: dict, top_key='mcpServers'):
+    obj = load_json(path, {})
+    if top_key == 'servers':
+        obj['servers'] = subset
+    else:
+        obj[top_key] = subset
+        if label == 'Gemini':
+            obj.setdefault('mcp', {})['allowed'] = sorted(subset.keys())
+    backup(path)
+    save_json(path, obj)
+    print(f"[OK] 已应用到 {label}: {path}")
+    return 0
+
+def apply_claude(subset):
+    # 文件端
+    apply_json_map('Claude(文件)', HOME/'.claude'/'settings.json', subset, 'mcpServers')
+    # 注册表端：移除多余，补齐缺失
+    try:
+        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=8)
+        have=set()
+        for line in (out.stdout or '').splitlines():
+            if ':' in line:
+                have.add(line.split(':',1)[0].strip())
+    except Exception:
+        have=set()
+    want=set(subset.keys())
+    # remove extras
+    for n in sorted(have-want):
+        try:
+            subprocess.run(['claude','mcp','remove',n], check=False, timeout=10)
+        except Exception:
+            pass
+    # add missing
+    obj,_ = load_central_servers()
+    servers = obj.get('servers') or {}
+    for n in sorted(want-have):
+        info = servers.get(n) or {}
+        cmd = ['claude','mcp','add','--transport','stdio', n]
+        for k,v in (info.get('env') or {}).items():
+            cmd += ['-e', f'{k}={v}']
+        cmd += ['--', info.get('command','')]
+        cmd += list(map(str, info.get('args') or []))
+        try:
+            subprocess.run(cmd, check=False, timeout=20)
+        except Exception:
+            pass
+    print('[OK] Claude 注册表已与所选集合对齐')
+    return 0
+
+def cmd_apply_cli(args):
+    subset = build_subset(args.servers.split(','))
+    if not subset:
+        print('[ERR] 服务器名无效或为空')
+        return 1
+    client = args.client
+    if client == 'claude':
+        return apply_claude(subset)
+    elif client == 'codex':
+        return apply_codex(subset)
+    elif client == 'gemini':
+        return apply_json_map('Gemini', HOME/'.gemini'/'settings.json', subset, 'mcpServers')
+    elif client == 'iflow':
+        return apply_json_map('iFlow', HOME/'.iflow'/'settings.json', subset, 'mcpServers')
+    elif client == 'droid':
+        return apply_json_map('Droid', HOME/'.factory'/'mcp.json', subset, 'mcpServers')
+    elif client == 'cursor':
+        return apply_json_map('Cursor', HOME/'.cursor'/'mcp.json', subset, 'mcpServers')
+    elif client == 'vscode-user':
+        return apply_json_map('VS Code(User)', HOME/'.config'/'Code'/'User'/'mcp.json', subset, 'servers')
+    elif client == 'vscode-insiders':
+        return apply_json_map('VS Code(Insiders)', HOME/'.config'/'Code - Insiders'/'User'/'mcp.json', subset, 'servers')
+    else:
+        print('[ERR] 未知 client')
+        return 2
+
+def cmd_pick(args):
+    # 简易交互：数字选择客户端 + 多选服务
+    clients = [
+        ('claude','Claude CLI'),
+        ('codex','Codex CLI'),
+        ('gemini','Gemini'),
+        ('iflow','iFlow'),
+        ('droid','Droid CLI'),
+        ('cursor','Cursor'),
+        ('vscode-user','VS Code(User)'),
+        ('vscode-insiders','VS Code(Insiders)')
+    ]
+    print('选择目标 CLI/IDE:')
+    for i,(key,label) in enumerate(clients, start=1):
+        print(f'  {i}) {label} [{key}]')
+    cidx = int(input('输入编号: ').strip() or '1')
+    client = clients[cidx-1][0]
+    # 服务器多选
+    _, servers = load_central_servers()
+    names = sorted(servers.keys())
+    print('\n选择要启用的 MCP（空格分隔编号）:')
+    for i,n in enumerate(names, start=1):
+        print(f'  {i:2}) {n}')
+    picks = input('输入编号列表: ').strip().split()
+    chosen = []
+    for p in picks:
+        if p.isdigit() and 1 <= int(p) <= len(names):
+            chosen.append(names[int(p)-1])
+    if not chosen:
+        print('[ERR] 未选择任何服务器')
+        return 1
+    print(f'将应用到 {client}:', ', '.join(chosen))
+    ok = input('确认? [y/N]: ').strip().lower() == 'y'
+    if not ok:
+        print('已取消')
+        return 0
+    return cmd_apply_cli(argparse.Namespace(client=client, servers=','.join(chosen)))
+
+def main():
+    p = argparse.ArgumentParser(prog='mcpctl', description='MCP 配置集/开关与按客户端落地（已移除 nvm 相关功能）')
+    sub = p.add_subparsers(dest='cmd', required=True)
+
+    sp_st = sub.add_parser('status', help='查看按客户端/IDE 的实际启用状态；也可用：mcpctl status codex')
+    sp_st.add_argument('client_pos', nargs='?', help='客户端别名，如 claude/codex/vscode 等')
+    sp_st.add_argument('--client', choices=['claude-file','claude-reg','codex','gemini','iflow','droid','cursor','vscode-user','vscode-ins'], help='仅查看指定客户端（更精确）')
+    sp_st.add_argument('--central', action='store_true', help='同时显示中央清单视图')
+    sp_st.set_defaults(func=cmd_status)
+
+    # 已移除：on/off/only
+
+    # 已移除：profile-save / profile-apply
+
+    # 新增：针对单个客户端/IDE 的专用落地
+    sp_ac = sub.add_parser('apply-cli', help='将所选服务器仅应用到指定 CLI/IDE 的配置文件')
+    sp_ac.add_argument('--client', required=True, choices=['claude','codex','gemini','iflow','droid','cursor','vscode-user','vscode-insiders'])
+    sp_ac.add_argument('--servers', required=True, help='以逗号分隔的服务器名，如 context7,serena')
+    sp_ac.set_defaults(func=cmd_apply_cli)
+
+    sub.add_parser('pick', help='交互式选择目标 CLI 与服务器集合并应用').set_defaults(func=cmd_pick)
+
+    # 已移除：sync（全量同步）
+    sub.add_parser('ide-all', help='将全部 MCP 写入 IDE（Cursor/VS Code），忽略启用标记').set_defaults(func=cmd_ide_all)
+    sp_run = sub.add_parser('run', help='按客户端应用集合后启动命令，例如：mcpctl run --client claude --servers context7,serena -- claude')
+    sp_run.add_argument('--client', required=True, choices=['claude','codex','gemini','iflow','droid','cursor','vscode-user','vscode-insiders'])
+    sp_run.add_argument('--servers', required=True, help='以逗号分隔的服务器名')
+    sp_run.add_argument('exec', nargs=argparse.REMAINDER, help='在 -- 之后的启动命令')
+    sp_run.set_defaults(func=cmd_run)
+    sub.add_parser('check', help='只读体检').set_defaults(func=cmd_check)
+
+    args = p.parse_args()
+    rc = args.func(args)
+    if isinstance(rc, int):
+        sys.exit(rc)
+
+if __name__ == '__main__':
+    main()
