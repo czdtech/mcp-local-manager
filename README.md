@@ -58,6 +58,12 @@ mcp-local-manager/
 
 ![MCP 架构图](docs/mcp-architecture.png)
 
+重新渲染（自动检测本地渲染器，优先 Mermaid CLI→PlantUML）：
+```
+bash scripts/render-diagrams.sh
+```
+详细说明见：`docs/RENDER_DIAGRAMS.md`
+
 ## 快速上手
 
 1. 体检 + 渲染统一清单 + 同步 + 体检
