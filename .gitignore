@@ -2,3 +2,4 @@ __pycache__/
 bin/__pycache__/
 *.pyc
 .DS_Store
+docs/puppeteer.config.json

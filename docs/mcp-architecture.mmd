@@ -1,15 +1,15 @@
 flowchart TD
-  CENTRAL["~/.mcp-central/config/mcp-servers.json"] --> SYNC["mcp-auto-sync.py\n(~/.mcp-central/bin)"]
-  CENTRAL --> MCPCTL["mcpctl\n按客户端落地\nstatus/apply-cli/run/ide-all"]
+  CENTRAL["~/.mcp-central/config/mcp-servers.json"] --> SYNC["mcp-auto-sync.py<br/>(~/.mcp-central/bin)"]
+  CENTRAL --> MCPCTL["mcpctl<br/>per-client apply<br/>status/apply-cli/run/ide-all"]
 
-  subgraph Targets[目标配置 (仅写 MCP 段)]
-    CODEX["Codex\n~/.codex/config.toml\n[mcp_servers.*]"]
-    GEMINI["Gemini\n~/.gemini/settings.json\nmcpServers + mcp.allowed"]
-    IFLOW["iFlow\n~/.iflow/settings.json\nmcpServers"]
-    CLAUDE_FILE["Claude(文件)\n~/.claude/settings.json\nmcpServers"]
-    CURSOR["Cursor\n~/.cursor/mcp.json\nmcpServers"]
-    VSCODE["VS Code\n~/.config/Code/User/mcp.json\nservers"]
-    DROID["Droid\n~/.factory/mcp.json\nmcpServers"]
+  subgraph Targets
+    CODEX["Codex<br/>~/.codex/config.toml<br/>[mcp_servers.*]"]
+    GEMINI["Gemini<br/>~/.gemini/settings.json<br/>mcpServers + mcp.allowed"]
+    IFLOW["iFlow<br/>~/.iflow/settings.json<br/>mcpServers"]
+    CLAUDE_FILE["Claude(file)<br/>~/.claude/settings.json<br/>mcpServers"]
+    CURSOR["Cursor<br/>~/.cursor/mcp.json<br/>mcpServers"]
+    VSCODE["VS Code<br/>~/.config/Code/User/mcp.json<br/>servers"]
+    DROID["Droid<br/>~/.factory/mcp.json<br/>mcpServers"]
   end
 
   SYNC --> CODEX
@@ -27,10 +27,10 @@ flowchart TD
   MCPCTL --> VSCODE
   MCPCTL --> DROID
 
-  CLAUDE_REG["Claude(注册表)\nclaude mcp add/remove\n(~/.claude.json 项目作用域)"]
-  SYNC -. 兜底注册 .-> CLAUDE_REG
+  CLAUDE_REG["Claude(register)<br/>claude mcp add/remove<br/>(~/.claude.json project scope)"]
+  SYNC -. fallback .-> CLAUDE_REG
 
-  RUNTIME[运行时（stdio）]
+  RUNTIME[Runtime stdio]
   CODEX --> RUNTIME
   GEMINI --> RUNTIME
   IFLOW --> RUNTIME
@@ -39,14 +39,14 @@ flowchart TD
   VSCODE --> RUNTIME
   DROID --> RUNTIME
 
-  subgraph Servers[MCP Servers (本机)]
-    CDT["chrome-devtools\ncommand: npx\nargs: -y chrome-devtools-mcp@0.9.0"]
-    PW["playwright\n~/.nvm/.../mcp-server-playwright"]
-    FS["filesystem\n~/.nvm/.../mcp-server-filesystem"]
-    ST["sequential-thinking\n~/.nvm/.../mcp-server-sequential-thinking"]
-    CMC["codex-cli\n~/.nvm/.../codex-mcp"]
-    CTX7["context7\n~/.nvm/.../context7-mcp"]
-    SERENA["serena\n~/.local/bin/serena start-mcp-server"]
+  subgraph Servers
+    CDT["chrome-devtools<br/>command: npx<br/>args: -y chrome-devtools-mcp@0.9.0"]
+    PW["playwright<br/>~/.nvm/.../mcp-server-playwright"]
+    FS["filesystem<br/>~/.nvm/.../mcp-server-filesystem"]
+    ST["sequential-thinking<br/>~/.nvm/.../mcp-server-sequential-thinking"]
+    CMC["codex-cli<br/>~/.nvm/.../codex-mcp"]
+    CTX7["context7<br/>~/.nvm/.../context7-mcp"]
+    SERENA["serena<br/>~/.local/bin/serena start-mcp-server"]
   end
 
   RUNTIME --> CDT
@@ -57,5 +57,5 @@ flowchart TD
   RUNTIME --> CTX7
   RUNTIME --> SERENA
 
-  CDT_LOCAL["可选(默认禁用)\nchrome-devtools-local\n--browserUrl http://127.0.0.1:9222"]
+  CDT_LOCAL["optional (disabled by default)<br/>chrome-devtools-local<br/>--browserUrl http://127.0.0.1:9222"]
   RUNTIME -.-> CDT_LOCAL
