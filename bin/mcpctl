@@ -2,7 +2,7 @@
 # mcpctl: 轻量命令行，用于按需启用/禁用 MCP 服务器、应用配置集(profile)，
 #         并将所选集合落地到指定 CLI/IDE（不再提供 nvm 相关切换）。
 
-import argparse, json, os, re, shutil, subprocess, sys
+import argparse, json, os, re, shutil, subprocess, sys, platform
 from pathlib import Path
 
 HOME = Path.home()
@@ -157,10 +157,18 @@ def ide_clients():
 def cmd_ide_all(args):
     obj, servers = load_central_servers()
     subset = {n: servers[n] for n in servers.keys()}  # 忽略 enabled，全部写入
-    # Cursor + VS Code(User/Insiders)
+    # Cursor
     apply_json_map('Cursor', HOME/'.cursor'/'mcp.json', subset, 'mcpServers')
-    apply_json_map('VS Code(User)', HOME/'.config'/'Code'/'User'/'mcp.json', subset, 'servers')
-    apply_json_map('VS Code(Insiders)', HOME/'.config'/'Code - Insiders'/'User'/'mcp.json', subset, 'servers')
+    # VS Code(User/Insiders) 路径按系统适配
+    os_name = platform.system().lower()
+    if os_name == 'darwin':
+        vsc_user = HOME/'Library'/'Application Support'/'Code'/'User'/'mcp.json'
+        vsc_ins = HOME/'Library'/'Application Support'/'Code - Insiders'/'User'/'mcp.json'
+    else:
+        vsc_user = HOME/'.config'/'Code'/'User'/'mcp.json'
+        vsc_ins = HOME/'.config'/'Code - Insiders'/'User'/'mcp.json'
+    apply_json_map('VS Code(User)', vsc_user, subset, 'servers')
+    apply_json_map('VS Code(Insiders)', vsc_ins, subset, 'servers')
     print('[OK] 已将全部 MCP 写入 IDE（Cursor/VS Code）')
     return 0
 
