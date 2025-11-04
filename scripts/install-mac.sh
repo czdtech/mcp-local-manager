@@ -60,8 +60,6 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
       "command": "npx",
       "args": ["-y","chrome-devtools-mcp@latest"],
       "env": {
-        "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin",
-        "npm_config_prefix": "${HOME}/.nvm/versions/node",
         "CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX": "1",
         "CHROME_DEVTOOLS_MCP_EXTRA_ARGS": "--disable-dev-shm-usage --disable-gpu"
       }
@@ -83,7 +81,7 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
       "type": "local",
       "command": "${HOME}/.local/bin/serena",
       "args": ["start-mcp-server","--context","desktop-app","--enable-web-dashboard","false","--enable-gui-log-window","false"],
-      "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin" }
+      "env": {}
     },
     "filesystem": {
       "enabled": true,

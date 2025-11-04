@@ -8,8 +8,6 @@
       "command": "npx",
       "args": ["-y","chrome-devtools-mcp@latest"],
       "env": {
-        "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin",
-        "npm_config_prefix": "~/.nvm/versions/node",
         "CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX": "1",
         "CHROME_DEVTOOLS_MCP_EXTRA_ARGS": "--disable-dev-shm-usage --disable-gpu"
       }
@@ -31,7 +29,7 @@
       "type": "local",
       "command": "~/.local/bin/serena",
       "args": ["start-mcp-server","--context","desktop-app","--enable-web-dashboard","false","--enable-gui-log-window","false"],
-      "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin" }
+      "env": {}
     },
     "filesystem": {
       "enabled": true,

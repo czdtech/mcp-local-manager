@@ -6,6 +6,7 @@
 - 相关 CLI（codex/gemini/iflow/claude/droid）已安装或允许稍后手动安装
 
 ## 一次安装
+（默认策略：所有 Node 生态 MCP 使用 `npx -y <package>@latest`，始终获取最新版；`serena` 走本地二进制）
 ```
 cd mcp-local-manager
 bash scripts/install-mac.sh
