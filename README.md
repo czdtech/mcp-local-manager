@@ -24,6 +24,14 @@ mcpctl status codex   # 等价于：mcpctl status --client codex
 mcpctl ide-all
 ```
 
+新人一键最小落地（本项目推荐默认）：
+```
+# 仅为 Cursor 启用 context7 + task-master-ai，其它 CLI/IDE 保持“裸奔”
+bash scripts/onboard-cursor-minimal.sh
+# 复验：
+mcpctl status cursor
+```
+
 用途：在 macOS 与 Linux 上以“单一来源”管理所有 CLI/编辑器的 MCP 服务器配置，做到一次修改、处处生效；并提供一键同步与只读健康检查。
 
 核心理念：

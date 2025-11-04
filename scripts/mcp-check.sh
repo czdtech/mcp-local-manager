@@ -270,11 +270,12 @@ PY
 # 可选：连通性探测（--probe）——调用各 CLI 的自检命令，观测实际“Connected/Disconnected”
 if printf '%s\n' "$@" | grep -q -- '--probe'; then
   echo "\n—— 连通性探测（CLI 侧）——"
-  if command -v cc >/dev/null 2>&1; then
-    echo "[cc] Claude Code: cc mcp list"
-    cc mcp list || true
+  # 使用 claude CLI（而非系统 cc 编译器）
+  if command -v claude >/dev/null 2>&1; then
+    echo "[claude] Claude CLI: claude mcp list"
+    claude mcp list || true
   else
-    echo "[cc] 未检测到 cc，跳过"
+    echo "[claude] 未检测到 claude CLI，跳过"
   fi
   echo
   if command -v gemini >/dev/null 2>&1; then

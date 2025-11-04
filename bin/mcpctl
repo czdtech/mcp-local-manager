@@ -84,10 +84,15 @@ def _codex_keys():
         return names
 
 def _claude_registered():
+    """更稳健地读取 Claude 注册表。
+    - 延长超时（30s），适配“Claude Code 智能启动”的网络探测
+    - 合并 stdout+stderr 解析，避免只读 stdout 漏项
+    """
     try:
-        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=8)
+        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=30)
+        text = (out.stdout or '') + "\n" + (out.stderr or '')
         reg = set()
-        for line in (out.stdout or '').splitlines():
+        for line in text.splitlines():
             if ':' in line:
                 reg.add(line.split(':',1)[0].strip())
         return reg
@@ -275,9 +280,10 @@ def apply_claude(subset):
     apply_json_map('Claude(文件)', HOME/'.claude'/'settings.json', subset, 'mcpServers')
     # 注册表端：移除多余，补齐缺失
     try:
-        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=8)
+        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=30)
         have=set()
-        for line in (out.stdout or '').splitlines():
+        text = (out.stdout or '') + "\n" + (out.stderr or '')
+        for line in text.splitlines():
             if ':' in line:
                 have.add(line.split(':',1)[0].strip())
     except Exception:
@@ -306,7 +312,7 @@ def apply_claude(subset):
         cmd += ['--', info.get('command','')]
         cmd += list(map(str, info.get('args') or []))
         try:
-            subprocess.run(cmd, check=False, timeout=20)
+            subprocess.run(cmd, check=False, timeout=45)
         except Exception:
             pass
     print('[OK] Claude 注册表已与所选集合对齐')
