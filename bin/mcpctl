@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 # mcpctl: 轻量命令行，用于按需启用/禁用 MCP 服务器、应用配置集(profile)，
 #         并将所选集合落地到指定 CLI/IDE（不再提供 nvm 相关切换）。
 
@@ -197,13 +198,6 @@ def cmd_run(args):
 ## 已移除：cmd_enable_all（默认视为全部启用）
 
  
-
-def cmd_nvm_use(args):
-    obj, servers = load_central_servers()
-    targets = args.names or [n for n,v in servers.items() if v.get('enabled', False)]
-    apply_node_version(servers, args.version, targets)
-    write_central_servers(obj)
-    print(f"[OK] 已切换 nvm 版本 {args.version} 于: {', '.join(targets)}")
 
 def cmd_sync(args):
     here = Path(__file__).resolve().parent.parent
