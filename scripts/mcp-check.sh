@@ -62,10 +62,27 @@ def cmp(center, target, scope):
     c_cmd, t_cmd = center.get('command'), target.get('command')
     c_args, t_args = center.get('args', []), target.get('args', [])
     c_env,  t_env  = center.get('env', {}),  target.get('env', {})
-    if (c_cmd or '') != (t_cmd or ''):
-        add(WARN, scope, f'command 不一致: central={c_cmd} != target={t_cmd}')
-    if list(c_args) != list(t_args):
-        add(WARN, scope, f'args 不一致: central={c_args} != target={t_args}')
+    # 允许的“混合策略”差异（按客户端/服务放行特例）
+    scope_l = scope.lower()
+    # 1) Gemini + task-master-ai: 允许从 npx 切换为全局二进制
+    if scope_l.startswith('gemini:task-master-ai'):
+        pass_cmd_args = True
+    # 2) Claude(file) + playwright: 允许 headless/isolated/executable-path 参数差异
+    elif scope_l.startswith('claude(file):playwright'):
+        # 若 target 参数是 central 的子集（忽略顺序）则放行
+        try:
+            pass_cmd_args = (set(map(str, t_args)) <= set(map(str, c_args))) and ((c_cmd or '') == (t_cmd or c_cmd or 'npx'))
+        except Exception:
+            pass_cmd_args = False
+    # 3) 其它默认严格比对
+    else:
+        pass_cmd_args = False
+
+    if not pass_cmd_args:
+        if (c_cmd or '') != (t_cmd or ''):
+            add(WARN, scope, f'command 不一致: central={c_cmd} != target={t_cmd}')
+        if list(c_args) != list(t_args):
+            add(WARN, scope, f'args 不一致: central={c_args} != target={t_args}')
     # env 对比策略：
     # - 仅在“必要键”缺失时告警（如 *_API_KEY）。
     # - 对 PATH、npm_config_prefix 等可推导/非关键键不告警。
@@ -176,7 +193,13 @@ def check_json(label, p: Path, key_servers='mcpServers'):
     names = set(servers.keys())
     miss = sorted(central_names - names)
     extra = sorted(names - central_names)
-    add(OK if not miss and not extra else WARN, f'{label}:names', f'缺少={miss or "无"}; 多出={extra or "无"}')
+    # “裸奔策略”允许部分客户端缺省（降级为 OK 提示）
+    label_l = label.lower()
+    bare_clients = {'cursor','vscode(user)','vscode(insiders)','droid','iflow'}
+    if label_l in bare_clients and miss:
+        add(OK, f'{label}:names', f'（按需最小化）缺少={miss or "无"}; 多出={extra or "无"}')
+    else:
+        add(OK if not miss and not extra else WARN, f'{label}:names', f'缺少={miss or "无"}; 多出={extra or "无"}')
     for n in sorted(central_names & names):
         cmp(central[n], servers.get(n) or {}, f'{label}:{n}')
 

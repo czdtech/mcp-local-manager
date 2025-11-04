@@ -283,17 +283,23 @@ def apply_claude(subset):
     except Exception:
         have=set()
     want=set(subset.keys())
-    # remove extras
+    # 先移除多余
     for n in sorted(have-want):
         try:
             subprocess.run(['claude','mcp','remove',n], check=False, timeout=10)
         except Exception:
             pass
-    # add missing
+    # 再“强制重注册”目标集合，确保命令/参数与中央清单一致
     obj,_ = load_central_servers()
     servers = obj.get('servers') or {}
-    for n in sorted(want-have):
+    for n in sorted(want):
         info = servers.get(n) or {}
+        # 先尝试移除旧记录，忽略错误
+        try:
+            subprocess.run(['claude','mcp','remove',n], check=False, timeout=10)
+        except Exception:
+            pass
+        # 重新添加为 stdio + 中央清单命令
         cmd = ['claude','mcp','add','--transport','stdio', n]
         for k,v in (info.get('env') or {}).items():
             cmd += ['-e', f'{k}={v}']
