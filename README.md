@@ -32,6 +32,12 @@ mcpctl ide-all
 - Claude：文件为主（`~/.claude/settings.json`），命令兜底仅补“缺失项”
  - 默认全部启用：清单里未显式写 `enabled: false` 的服务都视为启用；是否真正“加载”，由你对某个 CLI/IDE 的落地选择决定。
 
+推荐基线：
+- Node 生态 MCP 一律使用 `npx -y <package>@latest`，便于获得上游修复（如 `task-master-ai`）。
+- 仅 `serena` 走本地二进制（`~/.local/bin/serena`）。
+- 日常建议：仅对 Cursor 落地所需 MCP，其他 CLI/IDE 保持“裸奔”。
+- 混合策略：默认优先 npx；若某客户端（如 Gemini）对某个服务（如 `task-master-ai`）不稳定，则改为“全局二进制直连”（`npm i -g <pkg>@latest`，`command` 改为该二进制）。
+
 与最新方案对齐：
 - 不使用 wrappers；所有 server 直连二进制或官方推荐方式。
 - 统一采用显式最新版（@latest）以便始终获得更新：
@@ -81,6 +87,8 @@ mcpctl ide-all
 
 # 查看当前落地到某客户端的集合：
 mcpctl status claude    # 或 codex / vscode / cursor ...
+
+若使用 task-master-ai 且指定 `@latest`，首次启用如遇 npx 依赖缓存问题（`@inquirer/search` 等缺失），请参考 `docs/troubleshooting-mcp.md` 的“npx @latest 常见问题与修复”。
 ```
 
 ## 统一清单位置（两端通用）

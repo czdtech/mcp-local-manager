@@ -201,3 +201,55 @@ droid mcp add --type stdio playwright -- \
 ***
 
 最后更新：以实际脚本为准（`scripts/install-mac.sh`、`scripts/mcp-sync.sh`、`scripts/mcp-check.sh`）。
+
+---
+
+## 九、npx @latest 常见问题与修复（task-master-ai）
+
+症状：在 Cursor 将 `task-master-ai` 配置为 `npx -y task-master-ai@latest` 时，日志报错：
+
+```
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@inquirer/search' ...
+```
+
+原因：npx 的临时安装/缓存未完整解出最新版的 ESM 依赖（`@inquirer/search` 等），导致运行时解析失败。旧缓存版本（不写 `@latest`）可能不触发此问题。
+
+推荐修复（方案A，保持官方最小配置）：
+
+1) 清理缓存（用户目录下的 npx/npm 缓存）：
+
+```
+npm cache clean --force
+rm -rf ~/.npm/_npx/*
+```
+
+2) 预热（可选）：手动拉取最新版以填充缓存（首次可能较慢）：
+
+```
+npx -y task-master-ai@latest --help  # 或 --version
+```
+
+3) 恢复 Cursor 的官方最小配置：
+
+```
+"command": "npx",
+"args": ["-y", "task-master-ai@latest"]
+```
+
+4) 在 Cursor 的 MCP 面板对 `task-master-ai` 执行“关→开”，或重启 Cursor。
+
+备选（方案B，更快更稳，仍保持最新版）：
+
+- 全局安装：`npm i -g task-master-ai@latest`
+- Cursor 改为直连二进制：`"command": "task-master-ai"`, `"args": []`
+- 后续升级：周期性执行 `npm i -g task-master-ai@latest`
+
+混合策略建议：
+- 优先使用 npx（配置简单、始终最新）。
+- 针对个别客户端/服务（如 Gemini + task-master-ai）若出现 Disconnected 或依赖解析异常，切换为全局二进制直连；其它仍保留 npx，不必“一刀切”。
+
+提示：
+- 请至少配置一个可用 Provider 的 API Key（如 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`），否则最新版可能直接退出。
+- Node v22 出现 `punycode` 的 DeprecationWarning 可忽略。
+- 网络镜像导致的解析/超时问题，可清缓存后重试或先行“预热”。
+

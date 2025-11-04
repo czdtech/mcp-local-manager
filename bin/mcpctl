@@ -156,6 +156,15 @@ def ide_clients():
     return ['cursor','vscode-user','vscode-ins']
 
 def cmd_ide_all(args):
+    # 保护：默认确认，避免误覆盖“裸奔策略”
+    if not getattr(args, 'yes', False):
+        try:
+            resp = input('将把全部 MCP 写入 VS Code/Cursor，可能覆盖当前最小落地策略。继续？[y/N]: ').strip().lower()
+        except EOFError:
+            resp = 'n'
+        if resp != 'y':
+            print('已取消')
+            return 0
     obj, servers = load_central_servers()
     subset = {n: servers[n] for n in servers.keys()}  # 忽略 enabled，全部写入
     # Cursor
@@ -384,7 +393,9 @@ def main():
     sub.add_parser('pick', help='交互式选择目标 CLI 与服务器集合并应用').set_defaults(func=cmd_pick)
 
     # 已移除：sync（全量同步）
-    sub.add_parser('ide-all', help='将全部 MCP 写入 IDE（Cursor/VS Code），忽略启用标记').set_defaults(func=cmd_ide_all)
+    sp_ide = sub.add_parser('ide-all', help='将全部 MCP 写入 IDE（Cursor/VS Code），忽略启用标记')
+    sp_ide.add_argument('-y','--yes', action='store_true', help='不询问直接执行')
+    sp_ide.set_defaults(func=cmd_ide_all)
     sp_run = sub.add_parser('run', help='按客户端应用集合后启动命令，例如：mcpctl run --client claude --servers context7,serena -- claude')
     sp_run.add_argument('--client', required=True, choices=['claude','codex','gemini','iflow','droid','cursor','vscode-user','vscode-insiders'])
     sp_run.add_argument('--servers', required=True, help='以逗号分隔的服务器名')

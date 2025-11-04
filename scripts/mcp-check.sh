@@ -243,3 +243,21 @@ for r in results:
 print(f"\n结论: {worst}")
 sys.exit(0 if worst == OK else 1)
 PY
+
+# 可选：连通性探测（--probe）——调用各 CLI 的自检命令，观测实际“Connected/Disconnected”
+if printf '%s\n' "$@" | grep -q -- '--probe'; then
+  echo "\n—— 连通性探测（CLI 侧）——"
+  if command -v cc >/dev/null 2>&1; then
+    echo "[cc] Claude Code: cc mcp list"
+    cc mcp list || true
+  else
+    echo "[cc] 未检测到 cc，跳过"
+  fi
+  echo
+  if command -v gemini >/dev/null 2>&1; then
+    echo "[gemini] Gemini CLI: gemini mcp list"
+    gemini mcp list || true
+  else
+    echo "[gemini] 未检测到 gemini，跳过"
+  fi
+fi

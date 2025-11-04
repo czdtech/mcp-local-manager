@@ -59,6 +59,10 @@ IDE（VS Code/Cursor）写入全部 MCP；具体开关在 IDE 内操作：
 - 中央清单建议：Node 生态服务显式写 `npx -y <package>@latest`，保持最新；如需稳定，可对单个服务改为固定版本（`@x.y.z`）。
 - 成本建议：为降低 Token 消耗，建议 CLI（codex/claude/gemini/iflow/droid）按需落地甚至默认不落地；IDE 仅启用必要 MCP（如 `task-master-ai`、`context7`）。
 
+补充（task-master-ai 与 @latest）：
+- Cursor 端推荐最小配置：`"command":"npx","args":["-y","task-master-ai@latest"]`，在 `env` 中至少提供一个可用 Provider 的 API Key（如 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`）。
+- 若遇 npx 依赖缓存导致的模块缺失，可按 `docs/troubleshooting-mcp.md` 的“npx @latest 常见问题与修复”章节清缓存预热，或改为全局二进制直连方案。
+
 ## 故障排查
 
 - “status 显示 on/off 与你的预期不一致”：先确认查看的是目标客户端（如 status claude 而非空参）。
