@@ -163,10 +163,9 @@ npx -y @playwright/mcp@latest \
 
 ## 七、命令速查（示例）
 
-- Claude（注册，注意 `-e` 在 `--` 之前）
+- Claude（注册；一般无需传 PATH）
 ```bash
-claude mcp add --transport stdio codex-cli \
-  -e PATH="$PATH" -- npx -y @cexll/codex-mcp-server
+claude mcp add --transport stdio codex-cli -- npx -y @cexll/codex-mcp-server
 claude mcp remove codex-cli -s local  # 作用域示例
 ```
 
