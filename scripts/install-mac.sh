@@ -58,7 +58,7 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
       "enabled": true,
       "type": "local",
       "command": "npx",
-      "args": ["-y","chrome-devtools-mcp@0.9.0"],
+      "args": ["-y","chrome-devtools-mcp@latest"],
       "env": {
         "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin",
         "npm_config_prefix": "${HOME}/.nvm/versions/node",
@@ -69,15 +69,15 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
     "sequential-thinking": {
       "enabled": true,
       "type": "local",
-      "command": "$NODE_BIN/mcp-server-sequential-thinking",
-      "args": [],
+      "command": "npx",
+      "args": ["-y","@modelcontextprotocol/server-sequential-thinking@latest"],
       "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "${HOME}/.nvm/versions/node" }
     },
     "playwright": {
       "enabled": true,
       "type": "local",
-      "command": "$NODE_BIN/mcp-server-playwright",
-      "args": ["--headless","--isolated","--no-sandbox","--output-dir","$LOG_DIR/playwright","--executable-path","${CHROME_EXEC}"],
+      "command": "npx",
+      "args": ["-y","@playwright/mcp@latest","--headless","--isolated","--no-sandbox","--output-dir","$LOG_DIR/playwright","--executable-path","${CHROME_EXEC}"],
       "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin" }
     },
     "serena": {
@@ -90,22 +90,22 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
     "filesystem": {
       "enabled": true,
       "type": "local",
-      "command": "$NODE_BIN/mcp-server-filesystem",
-      "args": ["${HOME}/work","${HOME}/.mcp-central"],
+      "command": "npx",
+      "args": ["-y","mcp-server-filesystem@latest","${HOME}/work","${HOME}/.mcp-central"],
       "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin" }
     },
     "codex-cli": {
       "enabled": true,
       "type": "local",
-      "command": "$NODE_BIN/codex-mcp",
-      "args": [],
+      "command": "npx",
+      "args": ["-y","@cexll/codex-mcp-server@latest"],
       "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "${HOME}/.nvm/versions/node" }
     },
     "context7": {
       "enabled": true,
       "type": "local",
-      "command": "$NODE_BIN/context7-mcp",
-      "args": [],
+      "command": "npx",
+      "args": ["-y","@upstash/context7-mcp@latest"],
       "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "${HOME}/.nvm/versions/node" }
     }
   }

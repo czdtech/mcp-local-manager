@@ -34,8 +34,8 @@ mcpctl ide-all
 
 与最新方案对齐：
 - 不使用 wrappers；所有 server 直连二进制或官方推荐方式。
-- Chrome DevTools MCP 使用 npx，且固定版本（默认 0.9.0）以确保稳定：
-  `command: "npx"`, `args: ["-y","chrome-devtools-mcp@0.9.0"]`
+- 统一采用显式最新版（@latest）以便始终获得更新：
+  `command: "npx"`, `args: ["-y","chrome-devtools-mcp@latest"]`
 
 ## 目录
 

@@ -12,7 +12,7 @@ MCP Auto Sync (macOS/Linux)
           Linux ~/.config/Code*/User/mcp.json 顶层 servers
 
 与最新 ~/.mcp-central 对齐：
-- 不使用 wrappers；chrome-devtools 采用 npx 固定版本（推荐 0.9.0）。
+- 不使用 wrappers；Node 生态 server 统一采用 npx 显式最新版（@latest）。
 - Claude 命令兜底时，环境变量必须位于 name 与 "--" 之间：
   claude mcp add --transport stdio <name> -e KEY=VAL ... -- <command> <args>
 """

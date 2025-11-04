@@ -31,19 +31,21 @@
   - 例如：`sequential-thinking`、`task-master-ai`、`chrome-devtools`、`context7`、`playwright`、`filesystem`、`serena`
   - 常见历史别名：`sequentialthinking`、`taskmaster`、`Playwright`（首字母大写）——请移除。
 - 版本与调用
-  - 避免 `@latest` 带来不兼容；能固定则固定：`chrome-devtools-mcp@0.9.0`。
-  - 避免 wrappers（如 `~/.mcp/bin/*`），优先“本地二进制或固定版本 npx”。
-  - 本项目最终基线（可按需微调）：
-    - `codex-cli`：`npx -y @cexll/codex-mcp-server`（只保留一个 Codex 实例）
-    - `chrome-devtools`：`chrome-devtools-mcp`（本地可执行，推荐；需先全局安装）
-    - 其它常用：优先本地二进制（`context7-mcp`、`mcp-server-filesystem`、`mcp-server-sequential-thinking`、`serena`）
-    - `playwright`：本地二进制 + `--browser chrome`（详见下一节）
+  - 统一采用显式最新版：优先 `npx -y <package>@latest`，便于持续获取更新。
+  - 避免 wrappers（如 `~/.mcp/bin/*`），优先官方包或本地二进制。
+  - 本项目基线（可按需微调）：
+    - `codex-cli`：`npx -y @cexll/codex-mcp-server@latest`
+    - `chrome-devtools`：`npx -y chrome-devtools-mcp@latest`
+    - `context7`：`npx -y @upstash/context7-mcp@latest`
+    - `filesystem`：`npx -y mcp-server-filesystem@latest`
+    - `sequential-thinking`：`npx -y @modelcontextprotocol/server-sequential-thinking@latest`
+    - `playwright`：`npx -y @playwright/mcp@latest -- --browser chrome`（根据需要追加参数）
 
 ### Chrome DevTools 本地部署（推荐）
 
 - 全局安装/锁定版本
-  - 安装最新版：`npm i -g chrome-devtools-mcp`
-  - 指定版本：`npm i -g chrome-devtools-mcp@0.9.0`
+  - 直接使用 npx：`npx -y chrome-devtools-mcp@latest`
+  - 若需本地安装：`npm i -g chrome-devtools-mcp@latest`
 - 验证
   - `which chrome-devtools-mcp`、`chrome-devtools-mcp --help`
 - 中央清单示例
@@ -153,7 +155,7 @@
 - 显式 `env.PATH` / 绝对路径 / 创建 `~/.mcp-central/logs/playwright`
 
 4) 命名与版本一致性
-- 统一命名（小写-连字符）；Chrome DevTools 推荐本地安装，如需锁定可用 `npm i -g chrome-devtools-mcp@0.9.0`
+- 统一命名（小写-连字符）；Chrome DevTools 推荐使用 npx 或安装最新版 `npm i -g chrome-devtools-mcp@latest`
 - Codex MCP 仅保留一个：`codex-cli => npx -y @cexll/codex-mcp-server`
 
 ---

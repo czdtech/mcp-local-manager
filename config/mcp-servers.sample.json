@@ -6,7 +6,7 @@
       "enabled": true,
       "type": "local",
       "command": "npx",
-      "args": ["-y","chrome-devtools-mcp@0.9.0"],
+      "args": ["-y","chrome-devtools-mcp@latest"],
       "env": {
         "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin",
         "npm_config_prefix": "~/.nvm/versions/node",
@@ -17,15 +17,15 @@
     "sequential-thinking": {
       "enabled": true,
       "type": "local",
-      "command": "/path/to/mcp-server-sequential-thinking",
-      "args": [],
+      "command": "npx",
+      "args": ["-y","@modelcontextprotocol/server-sequential-thinking@latest"],
       "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "~/.nvm/versions/node" }
     },
     "playwright": {
       "enabled": true,
       "type": "local",
-      "command": "/path/to/mcp-server-playwright",
-      "args": ["--headless","--isolated","--no-sandbox","--output-dir","~/.mcp-central/logs/playwright","--executable-path","/path/to/chrome"],
+      "command": "npx",
+      "args": ["-y","@playwright/mcp@latest","--headless","--isolated","--no-sandbox","--output-dir","~/.mcp-central/logs/playwright","--executable-path","/path/to/chrome"],
       "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin" }
     },
     "serena": {
@@ -38,22 +38,22 @@
     "filesystem": {
       "enabled": true,
       "type": "local",
-      "command": "/path/to/mcp-server-filesystem",
-      "args": ["~/work","~/.mcp-central"],
+      "command": "npx",
+      "args": ["-y","mcp-server-filesystem@latest","~/work","~/.mcp-central"],
       "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin" }
     },
     "codex-cli": {
       "enabled": true,
       "type": "local",
-      "command": "/path/to/codex-mcp",
-      "args": [],
+      "command": "npx",
+      "args": ["-y","@cexll/codex-mcp-server@latest"],
       "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "~/.nvm/versions/node" }
     },
     "context7": {
       "enabled": true,
       "type": "local",
-      "command": "/path/to/context7-mcp",
-      "args": [],
+      "command": "npx",
+      "args": ["-y","@upstash/context7-mcp@latest"],
       "env": { "PATH": "/path/to/node/bin:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "~/.nvm/versions/node" }
     }
   }

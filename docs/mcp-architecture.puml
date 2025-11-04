@@ -47,7 +47,7 @@ VSCODE -down-> RUNTIME
 DROID -down-> RUNTIME
 
 package "MCP Servers (本机)" {
-  rectangle "chrome-devtools\ncommand: npx\nargs: -y chrome-devtools-mcp@0.9.0" as CDT
+  rectangle "chrome-devtools\ncommand: npx\nargs: -y chrome-devtools-mcp@latest" as CDT
   rectangle "playwright\n~/.nvm/.../mcp-server-playwright" as PW
   rectangle "filesystem\n~/.nvm/.../mcp-server-filesystem" as FS
   rectangle "sequential-thinking\n~/.nvm/.../mcp-server-sequential-thinking" as ST
@@ -68,7 +68,7 @@ rectangle "可选(默认禁用)\nchrome-devtools-local\n--browserUrl http://127.
 RUNTIME -down-> CDT_LOCAL
 
 note bottom of CDT
-  官方推荐用 npx，已固定 0.9.0
+  官方推荐用 npx，使用 @latest 始终保持最新
   避免 latest 带来不兼容
 end note
 
