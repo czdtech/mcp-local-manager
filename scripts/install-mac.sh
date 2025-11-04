@@ -100,6 +100,12 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
       "type": "local",
       "command": "npx",
       "args": ["-y","@upstash/context7-mcp@latest"]
+    },
+    "task-master-ai": {
+      "enabled": true,
+      "type": "local",
+      "command": "npx",
+      "args": ["-y","task-master-ai@latest"]
     }
   }
 }

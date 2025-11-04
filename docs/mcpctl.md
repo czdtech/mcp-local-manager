@@ -56,7 +56,8 @@ IDE（VS Code/Cursor）写入全部 MCP；具体开关在 IDE 内操作：
   - VS Code：~/.config/Code/User/mcp.json 与 ~/.config/Code - Insiders/User/mcp.json
   - Cursor：~/.cursor/mcp.json
 - 文件备份：所有改写会生成带时间戳的 .backup 便于回滚。
- - 中央清单建议：Node 生态服务显式写 `npx -y <package>@latest`，保持最新；如需稳定，可对单个服务改为固定版本（`@x.y.z`）。
+- 中央清单建议：Node 生态服务显式写 `npx -y <package>@latest`，保持最新；如需稳定，可对单个服务改为固定版本（`@x.y.z`）。
+- 成本建议：为降低 Token 消耗，建议 CLI（codex/claude/gemini/iflow/droid）按需落地甚至默认不落地；IDE 仅启用必要 MCP（如 `task-master-ai`、`context7`）。
 
 ## 故障排查
 

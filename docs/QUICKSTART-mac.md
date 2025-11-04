@@ -26,8 +26,8 @@ mcpctl run --client claude --servers context7,serena -- claude
 # 或者仅下发不启动：
 mcpctl apply-cli --client claude --servers context7,serena
 
-# IDE（VS Code/Cursor）全量写入，具体开关在 IDE 内操作：
-mcpctl ide-all
+# IDE（VS Code/Cursor）建议按需启用少量（示例：Cursor 只启用 task-master-ai + context7）：
+mcpctl apply-cli --client cursor --servers task-master-ai,context7
 
 # 查看当前集合：
 mcpctl status codex   # 或 claude/vscode/cursor

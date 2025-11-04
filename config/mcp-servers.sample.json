@@ -48,6 +48,12 @@
       "type": "local",
       "command": "npx",
       "args": ["-y","@upstash/context7-mcp@latest"]
+    },
+    "task-master-ai": {
+      "enabled": true,
+      "type": "local",
+      "command": "npx",
+      "args": ["-y","task-master-ai@latest"]
     }
   }
 }

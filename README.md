@@ -100,6 +100,8 @@ mcpctl status claude    # 或 codex / vscode / cursor ...
            macOS Insiders `~/Library/Application Support/Code - Insiders/User/mcp.json`
            Linux `~/.config/Code/User/mcp.json` 与 `~/.config/Code - Insiders/User/mcp.json`
 
+最小化与按需：为节省上下文与 Token，建议 CLI（codex/claude/gemini/iflow/droid）默认不落地 MCP（裸奔），IDE 按需启用少量（如 `task-master-ai`、`context7`）。
+
 附注（Claude 命令兜底语法，工具内部已自动处理）：
 ```
 claude mcp add --transport stdio <name> \

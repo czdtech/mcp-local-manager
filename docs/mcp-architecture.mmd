@@ -46,6 +46,7 @@ flowchart TD
     ST["sequential-thinking<br/>command: npx<br/>args: -y @modelcontextprotocol/server-sequential-thinking@latest"]
     CMC["codex-cli<br/>command: npx<br/>args: -y @cexll/codex-mcp-server@latest"]
     CTX7["context7<br/>command: npx<br/>args: -y @upstash/context7-mcp@latest"]
+    TMA["task-master-ai<br/>command: npx<br/>args: -y task-master-ai@latest"]
     SERENA["serena<br/>~/.local/bin/serena start-mcp-server"]
   end
 
@@ -55,6 +56,7 @@ flowchart TD
   RUNTIME --> ST
   RUNTIME --> CMC
   RUNTIME --> CTX7
+  RUNTIME --> TMA
   RUNTIME --> SERENA
 
   CDT_LOCAL["optional (disabled by default)<br/>chrome-devtools-local<br/>--browserUrl http://127.0.0.1:9222"]
