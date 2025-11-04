@@ -70,15 +70,13 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
       "enabled": true,
       "type": "local",
       "command": "npx",
-      "args": ["-y","@modelcontextprotocol/server-sequential-thinking@latest"],
-      "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "${HOME}/.nvm/versions/node" }
+      "args": ["-y","@modelcontextprotocol/server-sequential-thinking@latest"]
     },
     "playwright": {
       "enabled": true,
       "type": "local",
       "command": "npx",
-      "args": ["-y","@playwright/mcp@latest","--headless","--isolated","--no-sandbox","--output-dir","$LOG_DIR/playwright","--executable-path","${CHROME_EXEC}"],
-      "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin" }
+      "args": ["-y","@playwright/mcp@latest","--headless","--isolated","--no-sandbox","--output-dir","$LOG_DIR/playwright","--executable-path","${CHROME_EXEC}"]
     },
     "serena": {
       "enabled": true,
@@ -91,22 +89,19 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
       "enabled": true,
       "type": "local",
       "command": "npx",
-      "args": ["-y","mcp-server-filesystem@latest","${HOME}/work","${HOME}/.mcp-central"],
-      "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin" }
+      "args": ["-y","mcp-server-filesystem@latest","${HOME}/work","${HOME}/.mcp-central"]
     },
     "codex-cli": {
       "enabled": true,
       "type": "local",
       "command": "npx",
-      "args": ["-y","@cexll/codex-mcp-server@latest"],
-      "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "${HOME}/.nvm/versions/node" }
+      "args": ["-y","@cexll/codex-mcp-server@latest"]
     },
     "context7": {
       "enabled": true,
       "type": "local",
       "command": "npx",
-      "args": ["-y","@upstash/context7-mcp@latest"],
-      "env": { "PATH": "$NODE_BIN:/usr/local/bin:/usr/bin:/bin", "npm_config_prefix": "${HOME}/.nvm/versions/node" }
+      "args": ["-y","@upstash/context7-mcp@latest"]
     }
   }
 }

@@ -46,6 +46,7 @@
 - 全局安装/锁定版本
   - 直接使用 npx：`npx -y chrome-devtools-mcp@latest`
   - 若需本地安装：`npm i -g chrome-devtools-mcp@latest`
+  - 一般无需为 npx 配置 PATH/npm_config_prefix 等环境变量；仅在特殊场景（权限/企业镜像）下按需设置。
 - 验证
   - `which chrome-devtools-mcp`、`chrome-devtools-mcp --help`
 - 中央清单示例

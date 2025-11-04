@@ -35,7 +35,7 @@ mcpctl ide-all
 与最新方案对齐：
 - 不使用 wrappers；所有 server 直连二进制或官方推荐方式。
 - 统一采用显式最新版（@latest）以便始终获得更新：
-  `command: "npx"`, `args: ["-y","chrome-devtools-mcp@latest"]`
+  `command: "npx"`, `args: ["-y","<package>@latest"]`；除特殊场景（如 Chrome DevTools 的禁沙箱）外，无需设置 PATH/npm_config_prefix 等环境变量。
 
 ## 目录
 
