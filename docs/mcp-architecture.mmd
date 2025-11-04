@@ -41,11 +41,11 @@ flowchart TD
 
   subgraph Servers
     CDT["chrome-devtools<br/>command: npx<br/>args: -y chrome-devtools-mcp@latest"]
-    PW["playwright<br/>~/.nvm/.../mcp-server-playwright"]
-    FS["filesystem<br/>~/.nvm/.../mcp-server-filesystem"]
-    ST["sequential-thinking<br/>~/.nvm/.../mcp-server-sequential-thinking"]
-    CMC["codex-cli<br/>~/.nvm/.../codex-mcp"]
-    CTX7["context7<br/>~/.nvm/.../context7-mcp"]
+    PW["playwright<br/>command: npx<br/>args: -y @playwright/mcp@latest"]
+    FS["filesystem<br/>command: npx<br/>args: -y mcp-server-filesystem@latest"]
+    ST["sequential-thinking<br/>command: npx<br/>args: -y @modelcontextprotocol/server-sequential-thinking@latest"]
+    CMC["codex-cli<br/>command: npx<br/>args: -y @cexll/codex-mcp-server@latest"]
+    CTX7["context7<br/>command: npx<br/>args: -y @upstash/context7-mcp@latest"]
     SERENA["serena<br/>~/.local/bin/serena start-mcp-server"]
   end
 

@@ -77,9 +77,9 @@
 - 交互式 `/mcp` 读取的是“注册表”，仅有 `~/.factory/mcp.json` 或项目级 `.factory/mcp.json` 不足以在会话内显示。
 - 注册写法（务必使用 `--` 分隔）：
   - `droid mcp add --type stdio <name> -- <command> <args>`
-  - 例如（本地二进制）：
-    - `droid mcp add --type stdio playwright -- /Users/<you>/.nvm/versions/node/vXX/bin/mcp-server-playwright --headless --no-sandbox --browser chrome --output-dir ~/.mcp-central/logs/playwright`
-  - 传递环境：`--env PATH="/opt/node/bin:/usr/local/bin:/usr/bin:/bin"`
+  - 例如（npx 最新版）：
+    - `droid mcp add --type stdio playwright -- npx -y @playwright/mcp@latest --headless --no-sandbox --browser chrome --output-dir ~/.mcp-central/logs/playwright`
+  - 可选环境（若 droid 找不到 npx 再考虑添加）：`--env PATH="/opt/node/bin:/usr/local/bin:/usr/bin:/bin"`
 - 配置文件（兜底来源）
   - 全局：`~/.factory/mcp.json`
   - 项目级：`.factory/mcp.json`
@@ -108,14 +108,14 @@
 - “Disconnected”：多由可执行路径/参数/环境导致，非服务本体 bug。
 
 推荐做法（本地二进制 + 浏览器通道）：
-- 注册为：`mcp-server-playwright --headless --no-sandbox --browser chrome --output-dir ~/.mcp-central/logs/playwright`
+- 注册为：`npx -y @playwright/mcp@latest --headless --no-sandbox --browser chrome --output-dir ~/.mcp-central/logs/playwright`
 - 避免 `--executable-path` 路径差异；必要时显式注入 PATH。
 - 目录需存在：`~/.mcp-central/logs/playwright`（脚本已自动创建）。
 - 需要诊断时追加：`--save-session --save-trace`，产物落盘便于分析。
 
 自检命令（5 秒采样终止，仅验证能正常进入“等待连接”状态）：
 ```bash
-/Users/<you>/.nvm/versions/node/vXX/bin/mcp-server-playwright \
+npx -y @playwright/mcp@latest \
   --headless --no-sandbox --browser chrome \
   --output-dir ~/.mcp-central/logs/playwright
 # 无输出属正常；Ctrl+C 结束

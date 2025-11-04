@@ -48,11 +48,11 @@ DROID -down-> RUNTIME
 
 package "MCP Servers (本机)" {
   rectangle "chrome-devtools\ncommand: npx\nargs: -y chrome-devtools-mcp@latest" as CDT
-  rectangle "playwright\n~/.nvm/.../mcp-server-playwright" as PW
-  rectangle "filesystem\n~/.nvm/.../mcp-server-filesystem" as FS
-  rectangle "sequential-thinking\n~/.nvm/.../mcp-server-sequential-thinking" as ST
-  rectangle "codex-cli\n~/.nvm/.../codex-mcp" as CMC
-  rectangle "context7\n~/.nvm/.../context7-mcp" as CTX7
+  rectangle "playwright\ncommand: npx\nargs: -y @playwright/mcp@latest" as PW
+  rectangle "filesystem\ncommand: npx\nargs: -y mcp-server-filesystem@latest" as FS
+  rectangle "sequential-thinking\ncommand: npx\nargs: -y @modelcontextprotocol/server-sequential-thinking@latest" as ST
+  rectangle "codex-cli\ncommand: npx\nargs: -y @cexll/codex-mcp-server@latest" as CMC
+  rectangle "context7\ncommand: npx\nargs: -y @upstash/context7-mcp@latest" as CTX7
   rectangle "serena\n~/.local/bin/serena start-mcp-server" as SERENA
 }
 
