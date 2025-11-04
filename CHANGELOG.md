@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.2.1 (2025-11-04)
+
+- 体验：安装脚本追加 npx 预热与 `--probe` 连通性探测，贴近“一键完成”。
+- 体检：`mcp-check.sh` 支持 `--probe`，结合 `claude mcp list` / `gemini mcp list` 输出实际连通性。
+- CLI：`mcpctl ide-all` 增加确认提示；`apply-cli --client claude` 强制重注册，确保按中央清单收敛到 npx @latest（`serena` 仍本地二进制）。
+- 文档：新增“混合策略”（默认 npx，个别不稳改二进制直连）与 “npx @latest 常见问题（task-master-ai）” 的排障指引。
+
+升级指引（从 v1.1.x → v1.2.1）：
+
+1) 更新脚本：
+   - 拉取仓库最新 main；确保 PATH 指向当前仓库的 `bin/mcpctl`。
+2) 一键执行：
+   - `bash scripts/install-mac.sh`
+   - 安装脚本会完成：同步→（可选）npx 预热→体检+连通性探测。
+3) 精准落地（按需）：
+   - 仅对需要的客户端下发所需 MCP，例如：
+     - `mcpctl apply-cli --client cursor --servers task-master-ai,context7`
+     - `mcpctl apply-cli --client claude --servers filesystem,playwright`
+4) 验证：
+   - `mcpctl check --probe`（或 `claude/gemini mcp list`）。
+5) 如遇 `task-master-ai@latest` 在 Gemini 侧不稳：
+   - 切为全局二进制直连：`npm i -g task-master-ai@latest`，并将 Gemini 对应条目改为 `command: "task-master-ai"`、`args: []`。
+
 ## v1.1.1 (2025-11-04)
 
 - CLI: 兼容 Python 3.9（添加 `from __future__ import annotations` 延迟注解求值）。
