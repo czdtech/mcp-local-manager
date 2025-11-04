@@ -152,8 +152,8 @@ npx -y @playwright/mcp@latest \
 - 同步后自动精简目标端 env（清除冗长 PATH，仅 DevTools 保留必要键）
 
 3) Playwright 稳定化（如断开）
-- 改为：本地二进制 + `--browser chrome`（无需 `--executable-path`）
-- 显式 `env.PATH` / 绝对路径 / 创建 `~/.mcp-central/logs/playwright`
+- 改为：`npx -y @playwright/mcp@latest -- --browser chrome`（必要时追加参数）
+- 若环境找不到 npx，再考虑显式 `--env PATH=...` 或绝对路径。
 
 4) 命名与版本一致性
 - 统一命名（小写-连字符）；Chrome DevTools 推荐使用 npx 或安装最新版 `npm i -g chrome-devtools-mcp@latest`
@@ -180,9 +180,9 @@ droid mcp add --type stdio chrome-devtools -- \
 # --env CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX=1 \
 # --env CHROME_DEVTOOLS_MCP_EXTRA_ARGS='--disable-dev-shm-usage --disable-gpu'
 
-# Playwright 本地二进制 + 浏览器通道（推荐）
+# Playwright（npx 最新版）
 droid mcp add --type stdio playwright -- \
-  /Users/<you>/.nvm/versions/node/vXX/bin/mcp-server-playwright \
+  npx -y @playwright/mcp@latest \
   --headless --no-sandbox --browser chrome \
   --output-dir ~/.mcp-central/logs/playwright
 ```

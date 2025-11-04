@@ -9,5 +9,4 @@
   - 重新链接或更新 PATH 到最新 `bin/mcpctl`。
   - 执行 `mcpctl -h` 验证；如需，运行 `mcpctl check` 做只读体检。
 
-> 注：仓库推荐基线已对齐 README 所述（Chrome DevTools 固定 `npx -y chrome-devtools-mcp@0.9.0`）。如需应用到本机，修改 `~/.mcp-central/config/mcp-servers.json` 后使用 `mcpctl` 或同步脚本落地。
-
+> 注：当前仓库基线采用显式最新版（`npx -y <package>@latest`）；如需稳定，可在中央清单对单个服务改回固定版本（`@x.y.z`）。
