@@ -192,6 +192,31 @@ droid mcp add --type stdio playwright -- \
 
 ---
 
+## 八、实战踩坑录（2025-11-05）
+
+本仓库在一次“旧版 → 最新版”的现场升级过程中，暴露出若干典型问题，已在脚本与 CLI 中修复或形成标准操作。记录如下，便于新人“一次成功”。
+
+- Claude 项目级覆盖导致“清不干净”
+  - 现象：`mcpctl status` 显示 `Claude(register)` 仍有某项（如 `codex-cli`），`claude mcp list` 也显示 Connected；但已清空 `~/.claude/settings.json` 与注册表。
+  - 根因：`~/.claude.json` 内 `projects.*.mcpServers` 会覆盖/合并显示注册表与文件端。
+  - 处置：清空 `~/.claude.json` 中所有 `projects.*.mcpServers`；已将此步骤自动化到 `scripts/onboard-cursor-minimal.sh`，并增强 `mcpctl` 的注册表读取稳健性（延长超时、合并 stdout+stderr）。
+
+- 误用系统 `cc` 导致“连通性探测”异常输出
+  - 现象：体检脚本打印 `[cc] Claude Code: cc mcp list`，随后出现 clang 报错。
+  - 根因：`cc` 为系统 C 编译器，非 Claude CLI。早期脚本误用了 `cc` 名称。
+  - 处置：`scripts/mcp-check.sh` 已更正为 `claude mcp list`，不再触发编译器。
+
+- `serena` 路径与中央清单不一致
+  - 现象：中央清单默认使用 `~/.local/bin/serena`，本机真实在 `/usr/local/bin/serena`，体检 FAIL。
+  - 处置：探测实际路径后写回中央清单并同步；建议团队预置一条“探测并回写”的校准脚本或在安装手册明确路径。
+
+- `task-master-ai` 在 Gemini 端偶发 Disconnected
+  - 建议：采用“混合策略”——仅在 Gemini 端切为全局二进制直连（`npm i -g task-master-ai@latest`，将 Gemini 的 `command` 改为 `task-master-ai`、`args: []`）。体检已放宽该差异校验，不会告警。
+
+- 新人一次成活的最小落地
+  - 方案：运行 `bash scripts/onboard-cursor-minimal.sh`，仅为 Cursor 启用 `context7` 与 `task-master-ai`，其它 CLI/IDE 保持“裸奔”。
+  - 复验：`mcpctl status cursor` 应仅列出上述两项；`claude mcp list` 应为空。
+
 ## 八、结语
 
 - “单一来源 + 仅写 MCP 段 + 体检回路”能极大减少漂移与重复劳动。
@@ -252,4 +277,3 @@ npx -y task-master-ai@latest --help  # 或 --version
 - 请至少配置一个可用 Provider 的 API Key（如 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`），否则最新版可能直接退出。
 - Node v22 出现 `punycode` 的 DeprecationWarning 可忽略。
 - 网络镜像导致的解析/超时问题，可清缓存后重试或先行“预热”。
-

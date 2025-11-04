@@ -7,6 +7,21 @@
 
 ## 一次安装
 （默认策略：所有 Node 生态 MCP 使用 `npx -y <package>@latest`，始终获取最新版；`serena` 走本地二进制）
+
+新人一键最小落地（推荐）：
+
+```
+# 仅为 Cursor 启用 context7 + task-master-ai，其它 CLI/IDE 保持“裸奔”
+bash scripts/onboard-cursor-minimal.sh
+# 复验：
+mcpctl status cursor
+```
+
+若需对某 CLI 临时下发少量服务，请使用：
+
+```
+mcpctl apply-cli --client <cli> --servers context7,task-master-ai
+```
 ```
 cd mcp-local-manager
 bash scripts/install-mac.sh
