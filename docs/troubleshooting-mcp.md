@@ -41,25 +41,24 @@
     - `sequential-thinking`：`npx -y @modelcontextprotocol/server-sequential-thinking@latest`
     - `playwright`：`npx -y @playwright/mcp@latest -- --browser chrome`（根据需要追加参数）
 
-### Chrome DevTools 本地部署（推荐）
+### Chrome DevTools（npx 最新版）
 
-- 全局安装/锁定版本
-  - 直接使用 npx：`npx -y chrome-devtools-mcp@latest`
-  - 若需本地安装：`npm i -g chrome-devtools-mcp@latest`
-  - 一般无需为 npx 配置 PATH/npm_config_prefix 等环境变量；仅在特殊场景（权限/企业镜像）下按需设置。
+- 使用 npx：`npx -y chrome-devtools-mcp@latest`
+- 可选本地安装：`npm i -g chrome-devtools-mcp@latest`
+- 一般无需为 npx 配置 PATH/npm_config_prefix 等环境变量；仅在特殊场景（权限/企业镜像）下按需设置。
 - 验证
   - `which chrome-devtools-mcp`、`chrome-devtools-mcp --help`
 - 中央清单示例
-  - `command: "chrome-devtools-mcp"`
-  - `args: []`
+  - `command: "npx"`
+  - `args: ["-y","chrome-devtools-mcp@latest"]`
   - `env` 建议：
     - `CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX=1`
     - `CHROME_DEVTOOLS_MCP_EXTRA_ARGS="--disable-dev-shm-usage --disable-gpu"`
 - 注册表示例
   - Claude：
-    - `claude mcp add --transport stdio chrome-devtools -e CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX=1 -e CHROME_DEVTOOLS_MCP_EXTRA_ARGS='--disable-dev-shm-usage --disable-gpu' -- chrome-devtools-mcp`
+    - `claude mcp add --transport stdio chrome-devtools -e CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX=1 -e CHROME_DEVTOOLS_MCP_EXTRA_ARGS='--disable-dev-shm-usage --disable-gpu' -- npx -y chrome-devtools-mcp@latest`
   - Droid：
-    - `droid mcp add --type stdio chrome-devtools -- chrome-devtools-mcp`
+    - `droid mcp add --type stdio chrome-devtools -- npx -y chrome-devtools-mcp@latest`
 
 ---
 

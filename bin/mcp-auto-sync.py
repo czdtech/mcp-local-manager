@@ -64,6 +64,8 @@ def sync_codex():
         if not info.get('enabled', True):
             continue
         lines.append(f"\n[mcp_servers.{name}]")
+        # Codex: 增加启动超时，避免默认 10s 超时（npx 首次拉取较慢）
+        lines.append("startup_timeout_sec = 60")
         lines.append(f"command = \"{info.get('command','')}\"")
         args = info.get('args') or []
         if args:
