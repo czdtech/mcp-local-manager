@@ -25,6 +25,16 @@ IDE（VS Code/Cursor）写入全部 MCP；具体开关在 IDE 内操作：
 
     mcpctl ide-all
 
+安装/同步后建议：
+
+```
+# 可选预热，减少 npx 首次拉包失败
+bash scripts/npx-prewarm.sh
+
+# 一次看清配置+连通性
+mcpctl check --probe
+```
+
 ## 子命令
 
 - status [client] [--central]

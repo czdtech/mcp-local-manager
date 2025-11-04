@@ -114,6 +114,14 @@ JSON
 echo "[5/5] 同步并体检..."
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 python3 "$DIR/bin/mcp-auto-sync.py" sync
-bash "$DIR/scripts/mcp-check.sh"
+
+# 可选预热：首次 npx 拉包可能较慢，预热能减少失败概率
+if [ -x "$DIR/scripts/npx-prewarm.sh" ]; then
+  echo "[extra] 预热 npx 缓存（可忽略失败）..."
+  bash "$DIR/scripts/npx-prewarm.sh" || true
+fi
+
+# 连通性探测（结合各 CLI 自检命令）
+bash "$DIR/scripts/mcp-check.sh" --probe
 
 echo "完成。若结论为 OK，则可开始使用；若为 WARN/FAIL，请按提示项逐一处理。"

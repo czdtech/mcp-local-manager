@@ -76,6 +76,10 @@ bash scripts/render-diagrams.sh
 ```
 bash scripts/install-mac.sh
 ```
+- 脚本已自动：
+  - 同步各客户端 MCP（只改 MCP 段）
+  - 可选预热 npx 缓存（减少首次拉包失败）
+  - 运行体检并附带连通性探测（`--probe`）：调用 `claude mcp list`、`gemini mcp list` 等一并输出，便于“一次看清楚”。
 
 2. 之后日常更建议：
 ```
@@ -89,6 +93,10 @@ mcpctl ide-all
 mcpctl status claude    # 或 codex / vscode / cursor ...
 
 若使用 task-master-ai 且指定 `@latest`，首次启用如遇 npx 依赖缓存问题（`@inquirer/search` 等缺失），请参考 `docs/troubleshooting-mcp.md` 的“npx @latest 常见问题与修复”。
+
+一键失败排查（最少步骤）：
+- 执行：`bash scripts/npx-prewarm.sh`；再运行：`mcpctl check --probe`
+- 若仅某一端/某一服务连不上：只切换该服务为全局二进制（如 `task-master-ai` 在 Gemini），其它保持 npx 即可。
 ```
 
 ## 统一清单位置（两端通用）
