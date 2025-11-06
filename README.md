@@ -1,10 +1,10 @@
 # MCP Local Manager
 
 ![安装](https://img.shields.io/badge/%E5%AE%89%E8%A3%85-install--mac.sh-2ea44f?logo=gnubash&logoColor=white)
-![CLI](https://img.shields.io/badge/CLI-mcpctl-2ea44f?logo=gnubash&logoColor=white)
+![CLI](https://img.shields.io/badge/CLI-mcp%20%28mcpctl%29-2ea44f?logo=gnubash&logoColor=white)
 ![体检](https://img.shields.io/badge/%E4%BD%93%E6%A3%80-mcp--check.sh-2ea44f?logo=gnubash&logoColor=white)
 
-快速使用（默认不自动落地 MCP）
+快速使用（默认不自动落地 MCP；命令 mcp（别名 mcpctl））
 ```
 # 脚本路径（保留）
 # 安装脚本仅：体检→渲染统一清单→体检（不执行同步/落地）
@@ -16,27 +16,27 @@ bash scripts/mcp-sync.sh
 
 # CLI 路径（推荐日常使用）
 # 将所选 MCP 仅应用到某个 CLI/IDE：
-mcpctl apply-cli --client claude --servers context7,serena
+mcp apply-cli --client claude --servers context7,serena   # mcp == mcpctl
 # 交互选择并应用：
-mcpctl pick
+mcp pick
 # 应用后直接启动：
-mcpctl run --client claude --servers context7,serena -- claude
+mcp run --client claude --servers context7,serena -- claude
 # 查看单个客户端当前集合：
-mcpctl status codex   # 等价于：mcpctl status --client codex
+mcp status codex   # 等价于：mcp status --client codex
 # IDE（VS Code/Cursor）统一写入全部，具体开关在 IDE 内操作：
-mcpctl ide-all
+mcp ide-all
 ```
 
 预览（dry-run，不写入/不注册/不启动）：为任意命令追加 `-n` 或 `--dry-run`
 ```
 # 仅预览将写入 Claude 文件与注册表的变更
-mcpctl apply-cli -n --client claude --servers context7,serena
+mcp apply-cli -n --client claude --servers context7,serena
 
 # 仅预览将写入 VS Code/Cursor 的全集（不落地）
-mcpctl ide-all --dry-run
+mcp ide-all --dry-run
 
 # 仅预览按客户端应用后将要启动的命令
-mcpctl run -n --client claude --servers context7,serena -- claude
+mcp run -n --client claude --servers context7,serena -- claude
 ```
 
 新人一键最小落地（可选，推荐）：
@@ -44,7 +44,7 @@ mcpctl run -n --client claude --servers context7,serena -- claude
 # 仅为 Cursor 启用 context7 + task-master-ai，其它 CLI/IDE 保持“裸奔”
 bash scripts/onboard-cursor-minimal.sh
 # 复验：
-mcpctl status cursor
+mcp status cursor
 ```
 
 用途：在 macOS 与 Linux 上以“单一来源”管理所有 CLI/编辑器的 MCP 服务器配置，做到一次修改、处处生效；并提供一键同步与只读健康检查。
@@ -108,13 +108,13 @@ bash scripts/install-mac.sh
 2. 之后日常更建议（按需落地）：
 ```
 # Claude 轻量会话（只启用 context7+serena）：
-mcpctl run --client claude --servers context7,serena -- claude
+mcp run --client claude --servers context7,serena -- claude
 
 # IDE 全量可选（VS Code/Cursor）：
-mcpctl ide-all
+mcp ide-all
 
 # 查看当前落地到某客户端的集合：
-mcpctl status claude    # 或 codex / vscode / cursor ...
+mcp status claude    # 或 codex / vscode / cursor ...
 
 若使用 task-master-ai 且指定 `@latest`，首次启用如遇 npx 依赖缓存问题（`@inquirer/search` 等缺失），请参考 `docs/troubleshooting-mcp.md` 的“npx @latest 常见问题与修复”。
 

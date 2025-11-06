@@ -8,10 +8,12 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="$HOME/.local/bin:$PATH"
 
-echo "[1/6] 链接 mcpctl 到 ~/.local/bin ..."
+echo "[1/6] 链接 mcp/mcpctl 到 ~/.local/bin ..."
 mkdir -p "$HOME/.local/bin"
 ln -sf "$HERE/bin/mcpctl" "$HOME/.local/bin/mcpctl"
-which mcpctl >/dev/null 2>&1 || { echo "mcpctl 未就绪"; exit 1; }
+ln -sf "$HERE/bin/mcp" "$HOME/.local/bin/mcp"
+command -v mcpctl >/dev/null 2>&1 || { echo "mcpctl 未就绪"; exit 1; }
+command -v mcp >/dev/null 2>&1 || { echo "mcp 未就绪"; exit 1; }
 
 echo "[2/6] 准备中央清单（若缺失则创建仅含两项）..."
 CENTRAL="$HOME/.mcp-central/config/mcp-servers.json"

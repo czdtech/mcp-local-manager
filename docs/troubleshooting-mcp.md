@@ -11,11 +11,11 @@
   - 作用：所有客户端配置均由此渲染“仅 MCP 段”，不会触碰其它设置。
 - 安装与同步
   - 首次安装（macOS/Linux）：`bash scripts/install-mac.sh`（不落地 MCP，仅渲染统一清单与体检）
-  - 推荐日常：使用 `mcpctl` 按需落地而非全量同步：
-    - 查看某客户端集合：`mcpctl status codex` / `mcpctl status claude`
-    - 仅对某个 CLI 下发：`mcpctl apply-cli --client claude --servers context7,serena`
-    - 下发后直接启动：`mcpctl run --client claude --servers context7,serena -- claude`
-    - IDE 全量写入（VS Code/Cursor）：`mcpctl ide-all`
+  - 推荐日常：使用 `mcp`（或 `mcpctl`）按需落地而非全量同步（mcp == mcpctl）：
+    - 查看某客户端集合：`mcp status codex` / `mcp status claude`
+    - 仅对某个 CLI 下发：`mcp apply-cli --client claude --servers context7,serena`
+    - 下发后直接启动：`mcp run --client claude --servers context7,serena -- claude`
+    - IDE 全量写入（VS Code/Cursor）：`mcp ide-all`
   - 可选脚本路径：`bash scripts/mcp-sync.sh` → `bash scripts/mcp-check.sh`（仅当你需要一次性全量落地时使用）
   - 每次落地前，脚本会生成时间戳备份（`*.YYYYMMDD_HHMMSS.backup`）。
 - 体检脚本改进点（已内置在本仓库）

@@ -115,7 +115,7 @@ echo "[5/5] 健康检查（默认不落地 MCP）..."
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "[info] 安装脚本不会自动将 MCP 落地到各客户端。"
-echo "[info] 请使用 mcpctl 按需选择后落地：mcpctl pick / mcpctl apply-cli / mcpctl run"
+echo "[info] 请使用 mcp（或 mcpctl）按需选择后落地：mcp pick / mcp apply-cli / mcp run"
 
 # 可选预热：首次 npx 拉包可能较慢，预热能减少失败概率
 if [ -x "$DIR/scripts/npx-prewarm.sh" ]; then
@@ -127,4 +127,4 @@ fi
 bash "$DIR/scripts/mcp-check.sh" --probe
 
 echo "完成。脚本已生成统一清单并完成体检（未落地 MCP）。"
-echo "下一步：根据需要运行 mcpctl（例如：mcpctl apply-cli --client claude --servers context7,serena）。"
+echo "下一步：根据需要运行 mcp（或 mcpctl）（例如：mcp apply-cli --client claude --servers context7,serena）。"

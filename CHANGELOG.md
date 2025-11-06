@@ -9,6 +9,7 @@
   - `docs/QUICKSTART-mac.md` 移除“执行同步”表述，明确安装脚本不落地。
   - `docs/troubleshooting-mcp.md` 说明“默认不自动同步”，保留 `mcp-sync.sh` 作为可选路径。
  - CLI：`mcpctl` 新增 `-n/--dry-run` 预览模式，支持 `apply-cli`/`ide-all`/`run` 等子命令仅显示将进行的写入、注册与启动动作，不做实际修改。
+ - 新增别名：新增 `bin/mcp`（bash wrapper），与 `mcpctl` 等价；脚本与文档同步注明“mcp == mcpctl”。`scripts/onboard-cursor-minimal.sh` 现会同时链接并校验 `~/.local/bin/mcp` 与 `mcpctl`。
 
 ## v1.2.1 (2025-11-04)
 
