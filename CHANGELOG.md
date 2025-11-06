@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.2.2 (2025-11-06)
+
+- 行为变更：安装脚本默认不再自动同步/落地 MCP，仅生成统一清单并执行体检；需要落地时使用 `mcpctl pick/apply-cli/run` 或可选 `scripts/mcp-sync.sh`。
+- 脚本：`scripts/install-mac.sh` 去除 `mcp-auto-sync.py sync` 调用，新增明确提示“安装默认不落地 MCP，需用户自行选择 via mcpctl”。保留 npx 预热为可选步骤。
+- 文档：
+  - `README.md` 更新快速使用与目录说明，强调按需落地与最小化启用；`onboard-cursor-minimal.sh` 与 `mcpctl` 标注为“可选”。
+  - `docs/QUICKSTART-mac.md` 移除“执行同步”表述，明确安装脚本不落地。
+  - `docs/troubleshooting-mcp.md` 说明“默认不自动同步”，保留 `mcp-sync.sh` 作为可选路径。
+ - CLI：`mcpctl` 新增 `-n/--dry-run` 预览模式，支持 `apply-cli`/`ide-all`/`run` 等子命令仅显示将进行的写入、注册与启动动作，不做实际修改。
+
 ## v1.2.1 (2025-11-04)
 
 - 体验：安装脚本追加 npx 预热与 `--probe` 连通性探测，贴近“一键完成”。

@@ -111,9 +111,11 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
 }
 JSON
 
-echo "[5/5] 同步并体检..."
+echo "[5/5] 健康检查（默认不落地 MCP）..."
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
-python3 "$DIR/bin/mcp-auto-sync.py" sync
+
+echo "[info] 安装脚本不会自动将 MCP 落地到各客户端。"
+echo "[info] 请使用 mcpctl 按需选择后落地：mcpctl pick / mcpctl apply-cli / mcpctl run"
 
 # 可选预热：首次 npx 拉包可能较慢，预热能减少失败概率
 if [ -x "$DIR/scripts/npx-prewarm.sh" ]; then
@@ -124,4 +126,5 @@ fi
 # 连通性探测（结合各 CLI 自检命令）
 bash "$DIR/scripts/mcp-check.sh" --probe
 
-echo "完成。若结论为 OK，则可开始使用；若为 WARN/FAIL，请按提示项逐一处理。"
+echo "完成。脚本已生成统一清单并完成体检（未落地 MCP）。"
+echo "下一步：根据需要运行 mcpctl（例如：mcpctl apply-cli --client claude --servers context7,serena）。"

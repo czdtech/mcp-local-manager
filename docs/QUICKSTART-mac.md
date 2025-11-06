@@ -5,8 +5,8 @@
 - 可选：Chrome for Testing（若无则使用系统 Chrome 或 Playwright 自带）
 - 相关 CLI（codex/gemini/iflow/claude/droid）已安装或允许稍后手动安装
 
-## 一次安装
-（默认策略：所有 Node 生态 MCP 使用 `npx -y <package>@latest`，始终获取最新版；`serena` 走本地二进制）
+## 一次安装（不自动落地）
+（默认策略：所有 Node 生态 MCP 使用 `npx -y <package>@latest`，始终获取最新版；`serena` 走本地二进制。安装脚本仅渲染统一清单与体检，不执行同步/落地）
 
 新人一键最小落地（推荐）：
 
@@ -22,6 +22,11 @@ mcpctl status cursor
 ```
 mcpctl apply-cli --client <cli> --servers context7,task-master-ai
 ```
+
+仅预览（不写入）：可在任何命令加 `-n/--dry-run`，例如：
+```
+mcpctl apply-cli -n --client claude --servers context7,serena
+```
 ```
 cd mcp-local-manager
 bash scripts/install-mac.sh
@@ -29,7 +34,7 @@ bash scripts/install-mac.sh
 - 脚本会：
   - 体检 macOS 路径（VS Code/Insiders、Cursor、Node、Chrome）
   - 生成 `~/.mcp-central/config/mcp-servers.json`
-  - 执行同步（只改 MCP 段，Claude 命令兜底）
+  - 不执行同步（默认不落地 MCP，需按需使用 mcpctl）
   - 运行健康检查并输出结论
 
 ## 每次启动 CLI/IDE 前（推荐）

@@ -13,6 +13,12 @@ if [[ ! -f "$CENTRAL" ]]; then
   exit 1
 fi
 
+# jq 依赖：若缺失，友好提示并直接成功退出，不阻塞主流程
+if ! command -v jq >/dev/null 2>&1; then
+  warn "未安装 jq，跳过 npx 预热（建议安装 jq 以获得更好体验）"
+  exit 0
+fi
+
 pkgs=()
 mapfile -t pkgs < <(jq -r '.servers|to_entries[]|.value.args|select(type=="array")|map(tostring)|.[]' "$CENTRAL" 2>/dev/null | awk -F@ '/@/{print $1"@latest"}' | sed -E 's/^@(-y)?$//;t;')
 

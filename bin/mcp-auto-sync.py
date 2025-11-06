@@ -51,6 +51,25 @@ def kv(obj, k, default):
     v = obj.get(k)
     return v if v is not None else default
 
+def _expand_tilde(v):
+    """Expand leading '~' in strings; keep non-str intact."""
+    if isinstance(v, str):
+        try:
+            return os.path.expanduser(v)
+        except Exception:
+            return v
+    return v
+
+def _expand_cmd_args(info: dict):
+    """Return (command, args) with user tilde expansion applied."""
+    cmd = _expand_tilde(info.get('command', ''))
+    raw_args = info.get('args') or []
+    args = []
+    for a in raw_args:
+        # keep types, only expand str
+        args.append(_expand_tilde(a))
+    return cmd, args
+
 # ------------ Codex (TOML) ------------
 def sync_codex():
     p = HOME/'.codex'/'config.toml'
@@ -66,8 +85,8 @@ def sync_codex():
         lines.append(f"\n[mcp_servers.{name}]")
         # Codex: 增加启动超时，避免默认 10s 超时（npx 首次拉取较慢）
         lines.append("startup_timeout_sec = 60")
-        lines.append(f"command = \"{info.get('command','')}\"")
-        args = info.get('args') or []
+        cmd, args = _expand_cmd_args(info)
+        lines.append(f"command = \"{cmd}\"")
         if args:
             lines.append('args = ' + json.dumps(args))
         env = info.get('env') or {}
@@ -105,6 +124,11 @@ def build_mcpServers():
         for k in ('command','args','env','url','headers','type'):
             if k in info and info[k] not in (None, {} , []):
                 entry[k] = info[k]
+        # 统一展开 ~，避免目标文件中出现未展开路径
+        if 'command' in entry:
+            entry['command'] = _expand_tilde(entry['command'])
+        if 'args' in entry and isinstance(entry['args'], list):
+            entry['args'] = [_expand_tilde(a) for a in entry['args']]
         out[name]=entry
     return out
 
@@ -185,8 +209,9 @@ def sync_claude_cmd():
         # 环境变量必须在 name 与 -- 之间
         for k,v in (info.get('env') or {}).items():
             cmd.extend(['-e', f'{k}={v}'])
-        cmd += ['--', info.get('command','')]
-        cmd += info.get('args', [])
+        # 展开路径中的 ~，并保证 args 为字符串
+        cmd += ['--', _expand_tilde(info.get('command',''))]
+        cmd += [_expand_tilde(str(a)) for a in (info.get('args') or [])]
         try:
             subprocess.run(cmd, check=False, timeout=15)
         except Exception as e:

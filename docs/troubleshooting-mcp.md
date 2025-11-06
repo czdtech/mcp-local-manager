@@ -4,19 +4,19 @@
 
 ---
 
-## 一、单一来源与体检（新增 mcpctl 工作流）
+## 一、单一来源与体检（默认不自动同步）
 
 - 单一来源
   - 路径：`~/.mcp-central/config/mcp-servers.json`
   - 作用：所有客户端配置均由此渲染“仅 MCP 段”，不会触碰其它设置。
 - 安装与同步
-  - 首次安装（macOS/Linux）：`bash scripts/install-mac.sh`
+  - 首次安装（macOS/Linux）：`bash scripts/install-mac.sh`（不落地 MCP，仅渲染统一清单与体检）
   - 推荐日常：使用 `mcpctl` 按需落地而非全量同步：
     - 查看某客户端集合：`mcpctl status codex` / `mcpctl status claude`
     - 仅对某个 CLI 下发：`mcpctl apply-cli --client claude --servers context7,serena`
     - 下发后直接启动：`mcpctl run --client claude --servers context7,serena -- claude`
     - IDE 全量写入（VS Code/Cursor）：`mcpctl ide-all`
-  - 仍可使用脚本：`bash scripts/mcp-sync.sh` → `bash scripts/mcp-check.sh`
+  - 可选脚本路径：`bash scripts/mcp-sync.sh` → `bash scripts/mcp-check.sh`（仅当你需要一次性全量落地时使用）
   - 每次落地前，脚本会生成时间戳备份（`*.YYYYMMDD_HHMMSS.backup`）。
 - 体检脚本改进点（已内置在本仓库）
   - Codex TOML 兼容：缺少 Python 3.11 的 `tomllib` 时，使用轻量解析器回退，仅读取 `[mcp_servers.*]` 与 `.env` 段。
@@ -132,6 +132,10 @@ npx -y @playwright/mcp@latest \
 - PATH/二进制差异：必要时在 `env.PATH` 显式包含 Node bin 与系统路径；优先绝对路径。
 - 只想查看单一客户端状态：用 `mcpctl status codex|claude|vscode|cursor`，而不是读中央清单。
 - 启动前只加载少量 MCP：用 `mcpctl run --client <cli> --servers <list> -- <启动命令>`。
+
+提示（dry-run 预览变更）：
+- 在 `mcpctl` 任意子命令追加 `-n/--dry-run` 可只预览将发生的写入/注册/启动动作，不做任何修改。
+- 示例：`mcpctl apply-cli -n --client claude --servers context7,serena`、`mcpctl ide-all --dry-run`、`mcpctl run -n --client claude --servers context7,serena -- claude`。
 
 ---
 
