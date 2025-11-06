@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 60 秒引导：安装 mcpctl、准备统一清单、为 IDE 写入全部 MCP
+# 60 秒引导：安装 mcp、准备统一清单、为 IDE 写入全部 MCP
 
 REPO_URL="https://github.com/czdtech/mcp-local-manager.git"
 REPO_DIR="${REPO_DIR:-$PWD/mcp-local-manager}"
@@ -33,10 +33,10 @@ ensure_central() {
   fi
 }
 
-install_mcpctl() {
+install_mcp() {
   mkdir -p "$HOME/.local/bin"
-  ln -sf "$REPO_DIR/bin/mcpctl" "$HOME/.local/bin/mcpctl"
-  chmod +x "$REPO_DIR/bin/mcpctl"
+  ln -sf "$REPO_DIR/bin/mcp" "$HOME/.local/bin/mcp"
+  chmod +x "$REPO_DIR/bin/mcp"
   case "$SHELL" in
     */zsh) RC="$HOME/.zshrc" ;;
     *)     RC="$HOME/.bashrc" ;;
@@ -49,22 +49,22 @@ install_mcpctl() {
     log "已写入 PATH 到 $RC（新终端生效）"
   fi
   export PATH="$HOME/.local/bin:$PATH"
-  command -v mcpctl >/dev/null && log "mcpctl 就绪: $(command -v mcpctl)" || warn "未找到 mcpctl"
+  command -v mcp >/dev/null && log "mcp 就绪: $(command -v mcp)" || warn "未找到 mcp"
 }
 
 ide_full() {
   info "为 IDE 写入全部 MCP（VS Code/Cursor）..."
-  mcpctl ide-all >/dev/null || warn "mcpctl ide-all 执行失败，请稍后重试"
+  mcp ide-all >/dev/null || warn "mcp ide-all 执行失败，请稍后重试"
 }
 
 main() {
   ensure_repo
   ensure_central
-  install_mcpctl
+  install_mcp
   ide_full
   log "完成。下一步建议："
-  printf "\n- 仅对 Claude 下发并启动：\n  mcpctl run --client claude --servers context7,serena -- claude\n"
-  printf "- 查看某个客户端集合：\n  mcpctl status codex  # 或 claude / vscode / cursor\n\n"
+  printf "\n- 仅对 Claude 下发并启动：\n  mcp run --client claude --servers context7,serena -- claude\n"
+  printf "- 查看某个客户端集合：\n  mcp status codex  # 或 claude / vscode / cursor\n\n"
 }
 
 main "$@"

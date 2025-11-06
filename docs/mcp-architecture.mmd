@@ -1,6 +1,6 @@
 flowchart TD
   CENTRAL["~/.mcp-central/config/mcp-servers.json"] --> SYNC["mcp-auto-sync.py<br/>(~/.mcp-central/bin)"]
-  CENTRAL --> MCPCTL["mcpctl<br/>per-client apply<br/>status/apply-cli/run/ide-all"]
+  CENTRAL --> MCP["mcp<br/>per-client apply<br/>status/apply-cli/run/ide-all"]
 
   subgraph Targets
     CODEX["Codex<br/>~/.codex/config.toml<br/>[mcp_servers.*]"]
@@ -19,13 +19,13 @@ flowchart TD
   SYNC --> CURSOR
   SYNC --> VSCODE
   SYNC --> DROID
-  MCPCTL --> CODEX
-  MCPCTL --> GEMINI
-  MCPCTL --> IFLOW
-  MCPCTL --> CLAUDE_FILE
-  MCPCTL --> CURSOR
-  MCPCTL --> VSCODE
-  MCPCTL --> DROID
+  MCP --> CODEX
+  MCP --> GEMINI
+  MCP --> IFLOW
+  MCP --> CLAUDE_FILE
+  MCP --> CURSOR
+  MCP --> VSCODE
+  MCP --> DROID
 
   CLAUDE_REG["Claude(register)<br/>claude mcp add/remove<br/>(~/.claude.json project scope)"]
   SYNC -. fallback .-> CLAUDE_REG

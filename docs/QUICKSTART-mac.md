@@ -6,7 +6,7 @@
 - 相关 CLI（codex/gemini/iflow/claude/droid）已安装或允许稍后手动安装
 
 ## 一次安装（不自动落地）
-（默认策略：所有 Node 生态 MCP 使用 `npx -y <package>@latest`，始终获取最新版；`serena` 走本地二进制。安装脚本仅渲染统一清单与体检，不执行同步/落地。命令别名：`mcp == mcpctl`）
+（默认策略：所有 Node 生态 MCP 使用 `npx -y <package>@latest`，始终获取最新版；`serena` 走本地二进制。安装脚本仅渲染统一清单与体检，不执行同步/落地。CLI 命令为 `mcp`）
 
 新人一键最小落地（推荐）：
 
@@ -20,7 +20,7 @@ mcp status cursor
 若需对某 CLI 临时下发少量服务，请使用：
 
 ```
-mcp apply-cli --client <cli> --servers context7,task-master-ai  # mcp == mcpctl
+mcp apply-cli --client <cli> --servers context7,task-master-ai
 ```
 
 仅预览（不写入）：可在任何命令加 `-n/--dry-run`，例如：
@@ -34,11 +34,11 @@ bash scripts/install-mac.sh
 - 脚本会：
   - 体检 macOS 路径（VS Code/Insiders、Cursor、Node、Chrome）
   - 生成 `~/.mcp-central/config/mcp-servers.json`
-  - 不执行同步（默认不落地 MCP，需按需使用 mcpctl）
+  - 不执行同步（默认不落地 MCP，需按需使用 mcp）
   - 运行健康检查并输出结论
 
 ## 每次启动 CLI/IDE 前（推荐）
-优先用 mcpctl 按需下发，避免一次性加载全部服务：
+优先用 mcp 按需下发，避免一次性加载全部服务：
 ```
 # 例：Claude 只启用 context7+serena
 mcp run --client claude --servers context7,serena -- claude

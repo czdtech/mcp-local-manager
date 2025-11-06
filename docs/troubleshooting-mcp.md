@@ -11,7 +11,7 @@
   - 作用：所有客户端配置均由此渲染“仅 MCP 段”，不会触碰其它设置。
 - 安装与同步
   - 首次安装（macOS/Linux）：`bash scripts/install-mac.sh`（不落地 MCP，仅渲染统一清单与体检）
-  - 推荐日常：使用 `mcp`（或 `mcpctl`）按需落地而非全量同步（mcp == mcpctl）：
+  - 推荐日常：使用 `mcp` 按需落地而非全量同步：
     - 查看某客户端集合：`mcp status codex` / `mcp status claude`
     - 仅对某个 CLI 下发：`mcp apply-cli --client claude --servers context7,serena`
     - 下发后直接启动：`mcp run --client claude --servers context7,serena -- claude`
@@ -122,7 +122,7 @@ npx -y @playwright/mcp@latest \
 
 ---
 
-## 五、常见坑与修复（含 mcpctl 提示）
+## 五、常见坑与修复（含 mcp 提示）
 
 - `unknown option '-y'`（droid）：未使用 `--` 分隔，`-y` 被 droid 自身解析。
 - `No module named 'tomllib'`：体检脚本已内置回退；或升级到 Python 3.11+。
@@ -130,12 +130,12 @@ npx -y @playwright/mcp@latest \
 - VS Code/Kilo/Cursor 不生效：路径写错或放入 `settings.json`；改为其 MCP 专用文件。
 - 名称重复/大小写不一致：统一成小写-连字符；清理历史注册项（Claude/Droid）。
 - PATH/二进制差异：必要时在 `env.PATH` 显式包含 Node bin 与系统路径；优先绝对路径。
-- 只想查看单一客户端状态：用 `mcpctl status codex|claude|vscode|cursor`，而不是读中央清单。
-- 启动前只加载少量 MCP：用 `mcpctl run --client <cli> --servers <list> -- <启动命令>`。
+- 只想查看单一客户端状态：用 `mcp status codex|claude|vscode|cursor`，而不是读中央清单。
+- 启动前只加载少量 MCP：用 `mcp run --client <cli> --servers <list> -- <启动命令>`。
 
 提示（dry-run 预览变更）：
-- 在 `mcpctl` 任意子命令追加 `-n/--dry-run` 可只预览将发生的写入/注册/启动动作，不做任何修改。
-- 示例：`mcpctl apply-cli -n --client claude --servers context7,serena`、`mcpctl ide-all --dry-run`、`mcpctl run -n --client claude --servers context7,serena -- claude`。
+- 在 `mcp` 任意子命令追加 `-n/--dry-run` 可只预览将发生的写入/注册/启动动作，不做任何修改。
+- 示例：`mcp apply-cli -n --client claude --servers context7,serena`、`mcp ide-all --dry-run`、`mcp run -n --client claude --servers context7,serena -- claude`。
 
 ---
 
@@ -201,9 +201,9 @@ droid mcp add --type stdio playwright -- \
 本仓库在一次“旧版 → 最新版”的现场升级过程中，暴露出若干典型问题，已在脚本与 CLI 中修复或形成标准操作。记录如下，便于新人“一次成功”。
 
 - Claude 项目级覆盖导致“清不干净”
-  - 现象：`mcpctl status` 显示 `Claude(register)` 仍有某项（如 `codex-cli`），`claude mcp list` 也显示 Connected；但已清空 `~/.claude/settings.json` 与注册表。
+  - 现象：`mcp status` 显示 `Claude(register)` 仍有某项（如 `codex-cli`），`claude mcp list` 也显示 Connected；但已清空 `~/.claude/settings.json` 与注册表。
   - 根因：`~/.claude.json` 内 `projects.*.mcpServers` 会覆盖/合并显示注册表与文件端。
-  - 处置：清空 `~/.claude.json` 中所有 `projects.*.mcpServers`；已将此步骤自动化到 `scripts/onboard-cursor-minimal.sh`，并增强 `mcpctl` 的注册表读取稳健性（延长超时、合并 stdout+stderr）。
+  - 处置：清空 `~/.claude.json` 中所有 `projects.*.mcpServers`；已将此步骤自动化到 `scripts/onboard-cursor-minimal.sh`，并增强 `mcp` 的注册表读取稳健性（延长超时、合并 stdout+stderr）。
 
 - 误用系统 `cc` 导致“连通性探测”异常输出
   - 现象：体检脚本打印 `[cc] Claude Code: cc mcp list`，随后出现 clang 报错。
@@ -219,7 +219,7 @@ droid mcp add --type stdio playwright -- \
 
 - 新人一次成活的最小落地
   - 方案：运行 `bash scripts/onboard-cursor-minimal.sh`，仅为 Cursor 启用 `context7` 与 `task-master-ai`，其它 CLI/IDE 保持“裸奔”。
-  - 复验：`mcpctl status cursor` 应仅列出上述两项；`claude mcp list` 应为空。
+  - 复验：`mcp status cursor` 应仅列出上述两项；`claude mcp list` 应为空。
 
 ## 八、结语
 

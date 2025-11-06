@@ -1,6 +1,6 @@
-# mcpctl 命令参考
+# mcp 命令参考
 
-`mcpctl` 是一个极简 CLI，用于“按客户端/IDE 精准落地 MCP 配置”，避免一次性加载全部服务器导致上下文与 Token 消耗过大。
+`mcp` 是一个极简 CLI，用于“按客户端/IDE 精准落地 MCP 配置”，避免一次性加载全部服务器导致上下文与 Token 消耗过大。
 
 - 默认理念：中央清单未显式 `enabled: false` 的条目都视为启用；真正是否“加载”，由你对某个 CLI/IDE 的落地选择决定。
 - 不修改非 MCP 段；Claude 同步时会清理注册表的多余项、补齐缺失项。
@@ -9,21 +9,21 @@
 
 查看某个客户端的当前集合（别名见下）
 
-    mcpctl status codex
-    mcpctl status claude
-    mcpctl status vscode
+    mcp status codex
+    mcp status claude
+    mcp status vscode
 
 仅对 Claude 下发 context7+serena，并立即启动 Claude CLI：
 
-    mcpctl run --client claude --servers context7,serena -- claude
+    mcp run --client claude --servers context7,serena -- claude
 
 仅下发不启动：
 
-    mcpctl apply-cli --client claude --servers context7,serena
+    mcp apply-cli --client claude --servers context7,serena
 
 IDE（VS Code/Cursor）写入全部 MCP；具体开关在 IDE 内操作：
 
-    mcpctl ide-all
+    mcp ide-all
 
 安装/同步后建议：
 
@@ -32,7 +32,7 @@ IDE（VS Code/Cursor）写入全部 MCP；具体开关在 IDE 内操作：
 bash scripts/npx-prewarm.sh
 
 # 一次看清配置+连通性
-mcpctl check --probe
+mcp check --probe
 ```
 
 ## 子命令
@@ -56,8 +56,8 @@ mcpctl check --probe
 - run --client <client> --servers <...> -- <启动命令...>
   - 先按客户端应用集合，再执行启动命令；若省略启动命令，则只做应用不启动。
   - 示例：
-    - mcpctl run --client claude --servers context7,serena -- claude
-    - mcpctl run --client vscode-user --servers filesystem -- code .
+    - mcp run --client claude --servers context7,serena -- claude
+    - mcp run --client vscode-user --servers filesystem -- code .
 
 ## 注意事项
 
@@ -77,4 +77,4 @@ mcpctl check --probe
 
 - “status 显示 on/off 与你的预期不一致”：先确认查看的是目标客户端（如 status claude 而非空参）。
 - “run 后没有启动”：-- 之后是否跟了启动命令；省略时只做落地不启动。
-- “IDE 里未显示新条目”：先执行 mcpctl ide-all，让 IDE 文件包含完整集合，然后在 IDE 界面里逐项开关。
+- “IDE 里未显示新条目”：先执行 mcp ide-all，让 IDE 文件包含完整集合，然后在 IDE 界面里逐项开关。

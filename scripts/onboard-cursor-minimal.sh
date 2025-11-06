@@ -8,11 +8,9 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="$HOME/.local/bin:$PATH"
 
-echo "[1/6] 链接 mcp/mcpctl 到 ~/.local/bin ..."
+echo "[1/6] 链接 mcp 到 ~/.local/bin ..."
 mkdir -p "$HOME/.local/bin"
-ln -sf "$HERE/bin/mcpctl" "$HOME/.local/bin/mcpctl"
 ln -sf "$HERE/bin/mcp" "$HOME/.local/bin/mcp"
-command -v mcpctl >/dev/null 2>&1 || { echo "mcpctl 未就绪"; exit 1; }
 command -v mcp >/dev/null 2>&1 || { echo "mcp 未就绪"; exit 1; }
 
 echo "[2/6] 准备中央清单（若缺失则创建仅含两项）..."
@@ -56,7 +54,7 @@ PY
 fi
 
 echo "[3/6] 仅为 Cursor 落地两项 ..."
-mcpctl apply-cli --client cursor --servers context7,task-master-ai
+mcp apply-cli --client cursor --servers context7,task-master-ai
 
 echo "[4/6] 清空其它 CLI/IDE（裸奔）..."
 clean_json(){
@@ -131,8 +129,8 @@ if p.exists():
 PY
 
 echo "[6/6] 复验 ..."
-mcpctl status --client cursor
-mcpctl status --client claude-file
-mcpctl status --client claude-reg
-mcpctl status --client codex
+mcp status --client cursor
+mcp status --client claude-file
+mcp status --client claude-reg
+mcp status --client codex
 echo "\n完成：仅 Cursor 启用 context7+task-master-ai，其它均裸奔。"

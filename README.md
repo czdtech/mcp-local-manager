@@ -1,10 +1,10 @@
 # MCP Local Manager
 
 ![安装](https://img.shields.io/badge/%E5%AE%89%E8%A3%85-install--mac.sh-2ea44f?logo=gnubash&logoColor=white)
-![CLI](https://img.shields.io/badge/CLI-mcp%20%28mcpctl%29-2ea44f?logo=gnubash&logoColor=white)
+![CLI](https://img.shields.io/badge/CLI-mcp-2ea44f?logo=gnubash&logoColor=white)
 ![体检](https://img.shields.io/badge/%E4%BD%93%E6%A3%80-mcp--check.sh-2ea44f?logo=gnubash&logoColor=white)
 
-快速使用（默认不自动落地 MCP；命令 mcp（别名 mcpctl））
+快速使用（默认不自动落地 MCP；命令 mcp）
 ```
 # 脚本路径（保留）
 # 安装脚本仅：体检→渲染统一清单→体检（不执行同步/落地）
@@ -16,7 +16,7 @@ bash scripts/mcp-sync.sh
 
 # CLI 路径（推荐日常使用）
 # 将所选 MCP 仅应用到某个 CLI/IDE：
-mcp apply-cli --client claude --servers context7,serena   # mcp == mcpctl
+mcp apply-cli --client claude --servers context7,serena
 # 交互选择并应用：
 mcp pick
 # 应用后直接启动：
@@ -54,7 +54,7 @@ mcp status cursor
 - 仅改 MCP 段：不同目标只写入各自 MCP 部分（如 Codex 的 `[mcp_servers.*]`、Gemini 的 `mcpServers` 等），不触碰其它设置
 - Claude：文件为主（`~/.claude/settings.json`），命令兜底仅补“缺失项”
  - 默认全部启用：清单里未显式写 `enabled: false` 的服务都视为启用；是否真正“加载”，由你对某个 CLI/IDE 的落地选择决定。
- - 安装默认不落地：`scripts/install-mac.sh` 不会执行同步，需使用 `mcpctl` 按需选择后落地。
+ - 安装默认不落地：`scripts/install-mac.sh` 不会执行同步，需使用 `mcp` 按需选择后落地。
 
 推荐基线：
 - Node 生态 MCP 一律使用 `npx -y <package>@latest`，便于获得上游修复（如 `task-master-ai`）。
@@ -73,7 +73,7 @@ mcp status cursor
 mcp-local-manager/
 ├─ bin/
 │  ├─ mcp-auto-sync.py        # 跨平台同步（保留）
-│  └─ mcpctl                  # 终端 CLI（按客户端落地/查看/启动）
+│  └─ mcp                     # 终端 CLI（按客户端落地/查看/启动）
 ├─ scripts/
 │  ├─ install-mac.sh          # 首次安装：体检→渲染→体检（不自动同步）
 │  ├─ mcp-sync.sh             # 可选：全量同步（只改 MCP 段）
@@ -119,7 +119,7 @@ mcp status claude    # 或 codex / vscode / cursor ...
 若使用 task-master-ai 且指定 `@latest`，首次启用如遇 npx 依赖缓存问题（`@inquirer/search` 等缺失），请参考 `docs/troubleshooting-mcp.md` 的“npx @latest 常见问题与修复”。
 
 一键失败排查（最少步骤）：
-- 执行：`bash scripts/npx-prewarm.sh`；再运行：`mcpctl check --probe`
+- 执行：`bash scripts/npx-prewarm.sh`；再运行：`mcp check --probe`
 - 若仅某一端/某一服务连不上：只切换该服务为全局二进制（如 `task-master-ai` 在 Gemini），其它保持 npx 即可。
 ```
 
@@ -140,7 +140,7 @@ mcp status claude    # 或 codex / vscode / cursor ...
            macOS Insiders `~/Library/Application Support/Code - Insiders/User/mcp.json`
            Linux `~/.config/Code/User/mcp.json` 与 `~/.config/Code - Insiders/User/mcp.json`
 
-最小化与按需：为节省上下文与 Token，建议 CLI（codex/claude/gemini/iflow/droid）默认不落地 MCP（裸奔），IDE 按需启用少量（如 `task-master-ai`、`context7`）。安装脚本不会自动落地，需使用 `mcpctl`。
+最小化与按需：为节省上下文与 Token，建议 CLI（codex/claude/gemini/iflow/droid）默认不落地 MCP（裸奔），IDE 按需启用少量（如 `task-master-ai`、`context7`）。安装脚本不会自动落地，需使用 `mcp`。
 
 附注（Claude 命令兜底语法，工具内部已自动处理）：
 ```
@@ -156,8 +156,8 @@ claude mcp add --transport stdio <name> \
 - 推荐流程：
   1) 先运行 `scripts/mcp-check.sh` 只读体检，记录现状。
   2) 准备/确认 `~/.mcp-central/config/mcp-servers.json`（统一清单，未显式 false 的都视为启用）。
-  3) IDE 侧执行 `mcpctl ide-all`（把全部 MCP 写入 IDE，后续开关在 IDE 内操作）。
-  4) 启动某个 CLI 前，用 `mcpctl apply-cli` 或 `mcpctl run` 精确下发所需 MCP。
+  3) IDE 侧执行 `mcp ide-all`（把全部 MCP 写入 IDE，后续开关在 IDE 内操作）。
+  4) 启动某个 CLI 前，用 `mcp apply-cli` 或 `mcp run` 精确下发所需 MCP。
   5) 如需全量改写各目标，也可用 `scripts/mcp-sync.sh`。
 - 去重提示：
   - Cursor 建议只保留 `~/.cursor/mcp.json`，避免把 `mcpServers` 放在 `~/.config/cursor/User/settings.json` 造成重复展示。
