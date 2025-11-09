@@ -1,0 +1,20 @@
+{
+  "version": "1.1.0",
+  "description": "Valid test configuration",
+  "servers": {
+    "test-server": {
+      "enabled": true,
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "test-package@latest"],
+      "env": {
+        "TEST_VAR": "test_value"
+      }
+    },
+    "another-server": {
+      "enabled": false,
+      "command": "echo",
+      "args": ["hello"]
+    }
+  }
+}

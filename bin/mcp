@@ -6,18 +6,62 @@ from __future__ import annotations
 import argparse, json, os, re, shutil, subprocess, sys, platform
 from pathlib import Path
 
+# Import validation module with graceful fallback
+try:
+    from mcp_validation import (
+        validate_mcp_servers_config, 
+        MCPValidationError, 
+        MCPSchemaError, 
+        MCPConfigError,
+        format_validation_error
+    )
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    # Fallback when validation module is not available
+    VALIDATION_AVAILABLE = False
+    def validate_mcp_servers_config(config_path): return {}
+    class MCPValidationError(Exception): pass
+    class MCPSchemaError(Exception): pass
+    class MCPConfigError(Exception): pass
+    def format_validation_error(error): return f"❌ 配置错误: {str(error)}"
+
 HOME = Path.home()
 CENTRAL = HOME/'.mcp-central'/'config'/'mcp-servers.json'
 
 # 全局开关：dry-run（仅预览，不落地）
 DRY_RUN = False
 
-def load_json(p: Path, default):
+def load_json(p: Path, default, error_context: str = ""):
+    """Load JSON file with enhanced error handling.
+    
+    Args:
+        p: Path to the JSON file
+        default: Default value to return on error
+        error_context: Additional context for error messages
+        
+    Returns:
+        Parsed JSON object or default value
+    """
     if not p.exists():
         return default
     try:
-        return json.loads(p.read_text(encoding='utf-8'))
-    except Exception:
+        content = p.read_text(encoding='utf-8')
+        if not content.strip():
+            if error_context:
+                print(f"⚠️ 警告: {error_context} - 文件为空: {p}", file=sys.stderr)
+            return default
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        if error_context:
+            print(f"❌ {error_context} - JSON 解析错误: {p}", file=sys.stderr)
+            print(f"   错误位置: 行 {e.lineno}, 列 {e.colno}", file=sys.stderr)
+            if e.msg:
+                print(f"   错误信息: {e.msg}", file=sys.stderr)
+        return default
+    except Exception as e:
+        if error_context:
+            print(f"❌ {error_context} - 读取文件失败: {p}", file=sys.stderr)
+            print(f"   错误信息: {e}", file=sys.stderr)
         return default
 
 def save_json(p: Path, obj: dict):
@@ -33,8 +77,48 @@ def backup(p: Path):
     return b
 
 def load_central_servers():
-    obj = load_json(CENTRAL, {})
+    """Load central MCP servers configuration with validation.
+    
+    Returns:
+        tuple: (config_dict, servers_dict)
+    """
+    # First try to validate the configuration
+    validation_passed = False
+    obj = {}
+    
+    if VALIDATION_AVAILABLE and CENTRAL.exists():
+        try:
+            obj = validate_mcp_servers_config(CENTRAL)
+            validation_passed = True
+            print("✅ 中央配置已通过 schema 验证", file=sys.stderr) if getattr(load_central_servers, '_verbose', False) else None
+        except (MCPValidationError, MCPSchemaError) as e:
+            print(format_validation_error(e), file=sys.stderr)
+            print("⚠️  警告: Schema 验证失败，使用基本 JSON 解析（功能可能受限）", file=sys.stderr)
+            # Fall back to basic JSON loading
+            obj = load_json(CENTRAL, {}, "中央配置验证失败")
+        except Exception as e:
+            print(f"❌ 验证过程发生未知错误: {e}", file=sys.stderr)
+            print("⚠️  警告: 使用基本 JSON 解析", file=sys.stderr)
+            obj = load_json(CENTRAL, {}, "中央配置验证异常")
+    else:
+        # Validation not available, use basic loading
+        obj = load_json(CENTRAL, {}, "中央配置加载")
+    
+    # Extract servers with error handling
     servers = obj.get('servers') or {}
+    if not isinstance(servers, dict):
+        print("❌ 错误: 'servers' 字段必须是对象格式", file=sys.stderr)
+        servers = {}
+    
+    # Validate individual servers if validation is available
+    if VALIDATION_AVAILABLE and validation_passed:
+        from mcp_validation import validate_server_config
+        for server_name, server_info in servers.items():
+            try:
+                validate_server_config(server_name, server_info)
+            except MCPValidationError as e:
+                print(f"⚠️  服务器配置警告 - {server_name}: {e}", file=sys.stderr)
+    
     return obj, servers
 
 def write_central_servers(obj):
@@ -56,8 +140,18 @@ def list_servers():
     for n,st,cmd in rows:
         print(f"{n:26} {st:5}  {cmd}")
 
-def _json_keys(path: Path, pref_key='mcpServers'):
-    obj = load_json(path, {})
+def _json_keys(path: Path, pref_key='mcpServers', error_context: str = ""):
+    """Extract keys from JSON file with error handling.
+    
+    Args:
+        path: Path to the JSON file
+        pref_key: Preferred key to look for
+        error_context: Context for error messages
+        
+    Returns:
+        set: Set of keys found
+    """
+    obj = load_json(path, {}, error_context or f"读取 {path.name} 配置")
     if isinstance(obj.get(pref_key), dict):
         return set(obj[pref_key].keys())
     if isinstance(obj.get('servers'), dict):
@@ -149,24 +243,35 @@ def _expand_entry(entry: dict):
     return e
 
 def cmd_status(args):
-    obj, servers = load_central_servers()
+    """显示 MCP 服务器状态，包括中央配置和各客户端的实际启用状态"""
+    try:
+        obj, servers = load_central_servers()
+    except Exception as e:
+        print(f"❌ 加载中央配置失败: {e}", file=sys.stderr)
+        print("⚠️  尝试使用默认配置继续...", file=sys.stderr)
+        servers = {}
+        obj = {}
+    
     central_names = sorted(servers.keys())
+    print(f"📊 中央配置中的服务器数量: {len(central_names)}", file=sys.stderr)
+    
     # 可选显示中央清单
     if args.central:
         list_servers()
+    
     # 客户端/IDE 视图（可选过滤）
     # 允许位置参数 client_pos 或 --client；并支持简写别名
     sel = _normalize_client(getattr(args, 'client_pos', None)) or _normalize_client(args.client)
     targets = [
-        ('claude-file', 'Claude(file)', lambda: _json_keys(HOME/'.claude'/'settings.json', 'mcpServers')),
+        ('claude-file', 'Claude(file)', lambda: _json_keys(HOME/'.claude'/'settings.json', 'mcpServers', 'Claude配置读取')),
         ('claude-reg',  'Claude(register)', _claude_registered),
         ('codex',       'Codex', _codex_keys),
-        ('gemini',      'Gemini', lambda: _json_keys(HOME/'.gemini'/'settings.json', 'mcpServers')),
-        ('iflow',       'iFlow', lambda: _json_keys(HOME/'.iflow'/'settings.json', 'mcpServers')),
-        ('droid',       'Droid', lambda: _json_keys(HOME/'.factory'/'mcp.json', 'mcpServers')),
-        ('cursor',      'Cursor', lambda: _json_keys(HOME/'.cursor'/'mcp.json', 'mcpServers')),
-        ('vscode-user', 'VS Code(User)', lambda: _json_keys(HOME/'.config'/'Code'/'User'/'mcp.json', 'servers')),
-        ('vscode-ins',  'VS Code(Insiders)', lambda: _json_keys(HOME/'.config'/'Code - Insiders'/'User'/'mcp.json', 'servers')),
+        ('gemini',      'Gemini', lambda: _json_keys(HOME/'.gemini'/'settings.json', 'mcpServers', 'Gemini配置读取')),
+        ('iflow',       'iFlow', lambda: _json_keys(HOME/'.iflow'/'settings.json', 'mcpServers', 'iFlow配置读取')),
+        ('droid',       'Droid', lambda: _json_keys(HOME/'.factory'/'mcp.json', 'mcpServers', 'Droid配置读取')),
+        ('cursor',      'Cursor', lambda: _json_keys(HOME/'.cursor'/'mcp.json', 'mcpServers', 'Cursor配置读取')),
+        ('vscode-user', 'VS Code(User)', lambda: _json_keys(HOME/'.config'/'Code'/'User'/'mcp.json', 'servers', 'VS Code配置读取')),
+        ('vscode-ins',  'VS Code(Insiders)', lambda: _json_keys(HOME/'.config'/'Code - Insiders'/'User'/'mcp.json', 'servers', 'VS Code Insiders配置读取')),
     ]
     print("— 按客户端/IDE 的实际启用视图 —")
     for key, label, fn in targets:
@@ -174,7 +279,11 @@ def cmd_status(args):
             continue
         try:
             present = fn()
-        except Exception:
+            if args.verbose:
+                print(f"🔍 {label}: 找到 {len(present)} 个已配置服务器", file=sys.stderr)
+        except Exception as e:
+            if args.verbose:
+                print(f"⚠️  {label}: 读取配置时出错 - {e}", file=sys.stderr)
             present = set()
         _print_client(label, present, central_names)
 

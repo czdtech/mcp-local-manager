@@ -1,0 +1,10 @@
+{
+  "version": "1.1.0",
+  "description": "Malformed JSON",
+  "servers": {
+    "test": {
+      "command": "npx",
+      "args": ["invalid
+    }
+  }
+}

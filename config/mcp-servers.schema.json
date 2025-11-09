@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MCP Servers Configuration Schema",
+  "description": "Schema for validating mcp-servers.json configuration files",
+  "type": "object",
+  "required": ["version", "description", "servers"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Configuration file version",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the configuration",
+      "minLength": 1
+    },
+    "servers": {
+      "type": "object",
+      "description": "MCP servers configuration object",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Individual MCP server configuration",
+        "required": ["command"],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this server is enabled",
+            "default": true
+          },
+          "type": {
+            "type": "string",
+            "description": "Server type (e.g., local, remote)",
+            "minLength": 1
+          },
+          "command": {
+            "type": "string",
+            "description": "Command to execute for this server",
+            "minLength": 1
+          },
+          "args": {
+            "type": "array",
+            "description": "Command line arguments for the server",
+            "items": {
+              "type": "string"
+            }
+          },
+          "env": {
+            "type": "object",
+            "description": "Environment variables for the server",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string",
+            "description": "URL for remote servers",
+            "minLength": 1
+          },
+          "headers": {
+            "type": "object",
+            "description": "HTTP headers for remote servers",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

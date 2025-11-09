@@ -19,6 +19,27 @@ MCP Auto Sync (macOS/Linux)
 
 import json, os, re, shutil, subprocess, sys, platform
 from pathlib import Path
+import time
+import logging
+
+# Import validation module with graceful fallback
+try:
+    from mcp_validation import (
+        validate_mcp_servers_config, 
+        MCPValidationError, 
+        MCPSchemaError, 
+        MCPConfigError,
+        format_validation_error
+    )
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    # Fallback when validation module is not available
+    VALIDATION_AVAILABLE = False
+    def validate_mcp_servers_config(config_path): return {}
+    class MCPValidationError(Exception): pass
+    class MCPSchemaError(Exception): pass
+    class MCPConfigError(Exception): pass
+    def format_validation_error(error): return f"❌ 配置错误: {str(error)}"
 
 HOME = Path.home()
 OS = platform.system().lower()
@@ -40,12 +61,68 @@ def backup(p: Path):
     return b
 
 def load_central():
+    """Load central MCP servers configuration with validation and retry logic."""
     if not CENTRAL.exists():
         log_err(f'缺少统一清单: {CENTRAL}')
         sys.exit(1)
-    return json.loads(CENTRAL.read_text(encoding='utf-8')).get('servers', {})
+    
+    # Try to validate the configuration
+    validation_passed = False
+    config_data = {}
+    
+    if VALIDATION_AVAILABLE:
+        try:
+            config_data = validate_mcp_servers_config(CENTRAL)
+            validation_passed = True
+            log_info('中央配置已通过 schema 验证')
+        except (MCPValidationError, MCPSchemaError) as e:
+            log_warn('Schema 验证失败')
+            print(format_validation_error(e), file=sys.stderr)
+            log_warn('使用基本 JSON 解析（功能可能受限）')
+            # Fall back to basic JSON loading
+            config_data = _load_central_fallback()
+        except Exception as e:
+            log_err(f'验证过程发生未知错误: {e}')
+            log_warn('使用基本 JSON 解析')
+            config_data = _load_central_fallback()
+    else:
+        log_warn('验证功能不可用，使用基本 JSON 解析')
+        config_data = _load_central_fallback()
+    
+    servers = config_data.get('servers', {})
+    if not isinstance(servers, dict):
+        log_err("'servers' 字段必须是对象格式")
+        servers = {}
+    
+    # Validate individual servers if validation is available
+    if VALIDATION_AVAILABLE and validation_passed:
+        from mcp_validation import validate_server_config
+        for server_name, server_info in servers.items():
+            try:
+                validate_server_config(server_name, server_info)
+            except MCPValidationError as e:
+                log_warn(f'服务器配置警告 - {server_name}: {e}')
+    
+    return servers
 
-SERVERS = load_central()
+def _load_central_fallback():
+    """Fallback function to load central configuration without validation."""
+    try:
+        return json.loads(CENTRAL.read_text(encoding='utf-8'))
+    except json.JSONDecodeError as e:
+        log_err(f'中央配置文件 JSON 格式错误: {e}')
+        log_err(f'错误位置: 行 {e.lineno}, 列 {e.colno}')
+        sys.exit(1)
+    except Exception as e:
+        log_err(f'读取中央配置文件失败: {e}')
+        sys.exit(1)
+
+# Global servers configuration with enhanced error handling
+try:
+    SERVERS = load_central()
+except Exception as e:
+    log_err(f'加载中央配置失败: {e}')
+    SERVERS = {}
 
 def kv(obj, k, default):
     v = obj.get(k)
@@ -110,10 +187,59 @@ def sync_codex():
     return True
 
 # ------------ JSON helpers ------------
-def write_json(path: Path, obj: dict):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    backup(path)
-    path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding='utf-8')
+def write_json(path: Path, obj: dict, max_retries: int = 3, retry_delay: float = 0.1):
+    """Write JSON file with retry logic and enhanced error handling.
+    
+    Args:
+        path: Path to write the file
+        obj: Dictionary to serialize to JSON
+        max_retries: Maximum number of retry attempts
+        retry_delay: Delay between retries in seconds
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            backup(path)
+            content = json.dumps(obj, ensure_ascii=False, indent=2)
+            path.write_text(content, encoding='utf-8')
+            return True
+        except PermissionError as e:
+            if attempt < max_retries:
+                log_warn(f'权限错误 (尝试 {attempt + 1}/{max_retries + 1}): {path} - {e}')
+                time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+                continue
+            else:
+                log_err(f'权限错误，无法写入文件: {path} - {e}')
+                return False
+        except OSError as e:
+            if attempt < max_retries:
+                log_warn(f'系统错误 (尝试 {attempt + 1}/{max_retries + 1}): {path} - {e}')
+                time.sleep(retry_delay * (2 ** attempt))
+                continue
+            else:
+                log_err(f'系统错误，无法写入文件: {path} - {e}')
+                return False
+        except Exception as e:
+            log_err(f'写入文件时发生未知错误: {path} - {e}')
+            return False
+    return False
+
+def write_json_with_retry(path: Path, obj: dict, label: str = "", max_retries: int = 3):
+    """Write JSON file with retry logic and logging.
+    
+    Args:
+        path: Path to write the file
+        obj: Dictionary to serialize to JSON
+        label: Label for logging purposes
+        max_retries: Maximum number of retry attempts
+    """
+    success = write_json(path, obj, max_retries)
+    if success:
+        if label:
+            log_ok(f'{label} 配置已更新: {path}')
+        else:
+            log_ok(f'配置已更新: {path}')
+    return success
 
 def build_mcpServers():
     out = {}
@@ -133,19 +259,39 @@ def build_mcpServers():
     return out
 
 def sync_json_map(label, p: Path, key='mcpServers', allowed=False):
+    """Sync JSON configuration with enhanced error handling and retry logic.
+    
+    Args:
+        label: Label for logging
+        p: Path to the configuration file
+        key: Key to use for MCP servers
+        allowed: Whether to set allowed list for Gemini
+        
+    Returns:
+        bool: True if successful
+    """
     obj = {}
     if p.exists():
         try:
-            obj = json.loads(p.read_text(encoding='utf-8'))
+            content = p.read_text(encoding='utf-8')
+            if not content.strip():
+                log_warn(f'{label} 文件为空，将重写: {p}')
+                obj = {}
+            else:
+                obj = json.loads(content)
+        except json.JSONDecodeError as e:
+            log_warn(f'{label} JSON 解析失败，将重写: {e}')
+            log_warn(f'错误位置: 行 {e.lineno}, 列 {e.colno}')
+            obj = {}
         except Exception as e:
-            log_warn(f'{label} 解析失败，将重写: {e}')
+            log_warn(f'{label} 读取失败，将重写: {e}')
             obj = {}
     obj[key] = build_mcpServers()
     if allowed:
         obj.setdefault('mcp', {})['allowed'] = sorted(obj[key].keys())
-    write_json(p, obj)
-    log_ok(f'{label} 配置已更新: {p}')
-    return True
+    
+    # Use retry-enabled write function
+    return write_json_with_retry(p, obj, label)
 
 def sync_gemini():
     return sync_json_map('Gemini', HOME/'.gemini'/'settings.json', 'mcpServers', allowed=True)
@@ -160,16 +306,27 @@ def sync_cursor():
     return sync_json_map('Cursor', HOME/'.cursor'/'mcp.json', 'mcpServers')
 
 def sync_vscode():
+    """Sync VS Code configuration with enhanced error handling."""
     if OS=='darwin':
         paths = [HOME/'Library'/'Application Support'/'Code'/'User'/'mcp.json',
                  HOME/'Library'/'Application Support'/'Code - Insiders'/'User'/'mcp.json']
     else:
         paths = [HOME/'.config'/'Code'/'User'/'mcp.json',
                  HOME/'.config'/'Code - Insiders'/'User'/'mcp.json']
+    
     servers = build_mcpServers()
+    success_count = 0
+    
     for p in paths:
-        write_json(p, {'servers': servers})
-        log_ok(f'VS Code 配置已更新: {p}')
+        success = write_json_with_retry(p, {'servers': servers}, f'VS Code ({p.parent.parent.name})')
+        if success:
+            success_count += 1
+    
+    if success_count == 0:
+        log_err('所有 VS Code 配置更新失败')
+        return False
+    elif success_count < len(paths):
+        log_warn(f'部分 VS Code 配置更新失败: {success_count}/{len(paths)}')
     return True
 
 # ------------ Claude (文件为主，命令兜底) ------------
