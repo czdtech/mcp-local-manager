@@ -15,16 +15,16 @@
 
 仅对 Claude 下发 context7+serena，并立即启动 Claude CLI：
 
-    mcp run --client claude --servers context7,serena -- claude
+    运行 `mcp run` 进入交互式选择（可输入启动命令）
 
 仅下发不启动：
 
-    mcp run --client claude --servers context7,serena
+    运行 `mcp run` 进入交互式选择（只做落地不启动时直接回车）
 
 为 VS Code/Cursor 按需落地（示例）：
 
-    mcp run --client cursor --servers task-master-ai,context7
-    mcp run --client vscode-user --servers filesystem
+    运行 `mcp run` 交互式选择 Cursor 并下发所需
+    运行 `mcp run` 交互式选择 VS Code 并下发所需
 
 安装/同步后建议：
 
@@ -44,21 +44,17 @@ mcp check
     - claude(= claude-file)、claude-reg、codex、gemini、iflow、droid、cursor、vscode(=vscode-user)、vscode-insiders
   - --central 可选显示中央清单（通常不需要）。
 
-（已移除）apply-cli：请使用 `mcp run --client <client> --servers <...>`；若省略 `--` 后的启动命令，则只做落地。
+（已收敛）不再提供参数式配置命令，全部改为交互模式：
 
-- pick
-  - 交互式选择目标 CLI/IDE 与 MCP 集合并应用。
+- pick（隐藏入口）
+  - 保留为向后兼容的交互入口；建议直接使用 `mcp run`。
 
+- run（交互式）
+  - 运行 `mcp run` 后，依提示选择客户端与服务集合；可选输入启动命令；直接回车仅落地不启动。
 
-- run --client <client> --servers <...> -- <启动命令...>
-  - 先按客户端应用集合，再执行启动命令；若省略启动命令，则只做应用不启动。
-  - 示例：
-    - mcp run --client claude --servers context7,serena -- claude
-    - mcp run --client vscode-user --servers filesystem -- code .
-
-- clear [--client <client>|all] [-y]
-  - 一键清除 MCP 配置；默认 `--client all`，可定向单个客户端。
-  - 会备份配置文件；支持 `-n/--dry-run` 仅预览。
+- clear（交互式）
+  - 进入交互式选择要清理的客户端并确认。
+  - 会备份配置文件；在交互中展示预览并确认。
   - 覆盖：Claude(文件+注册表)、Codex、Gemini、iFlow、Droid、Cursor、VS Code(User/Insiders)。
 
 ## 注意事项
@@ -80,5 +76,5 @@ mcp check
 ## 故障排查
 
 - “status 显示 on/off 与你的预期不一致”：先确认查看的是目标客户端（如 status claude 而非空参）。
-- “run 后没有启动”：-- 之后是否跟了启动命令；省略时只做落地不启动。
-- “IDE 里未显示新条目”：请使用 `mcp run --client <cursor|vscode-user|vscode-insiders> --servers <...>` 将所需服务写入对应 IDE，然后在 IDE 内逐项开关。
+- “run 后没有启动”：在交互里输入启动命令；回车跳过则只做落地不启动。
+- “IDE 里未显示新条目”：请运行 `mcp run` 交互式选择 Cursor/VS Code，并选择需要的服务写入。

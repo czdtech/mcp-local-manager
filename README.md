@@ -19,36 +19,13 @@ bash scripts/mcp-check.sh     # 只读健康检查
 ### CLI 命令（推荐日常使用）
 
 ```bash
-# 将所选 MCP 仅应用到某个 CLI/IDE：
-mcp run --client claude --servers context7,serena
-
-# 交互选择并应用：
-mcp pick
-
-# 应用后直接启动：
-mcp run --client claude --servers context7,serena -- claude
-
-# 查看单个客户端当前集合：
-mcp status codex   # 等价于：mcp status --client codex
-
-# 为 VS Code/Cursor 按需落地（示例）：
-mcp run --client cursor --servers task-master-ai,context7
-mcp run --client vscode-user --servers filesystem
+运行 `mcp run` / `mcp clear` / `mcp central` 进入交互式向导完成配置与管理；
+只读命令 `mcp status` / `mcp check` 直接输出结果。
 ```
 
-### 预览模式（dry-run）
+### 交互预览与确认
 
-为任意命令追加 \`-n\` 或 \`--dry-run\` 可预览变更而不实际执行：
-
-```bash
-# 仅预览将写入 Claude 文件与注册表的变更
-mcp -n run --client claude --servers context7,serena
-
-# 仅预览将写入某个客户端（不落地）
-
-# 仅预览按客户端应用后将要启动的命令
-mcp run -n --client claude --servers context7,serena -- claude
-```
+所有写入操作在交互步骤中提供“变更摘要 + 最终确认”，不再提供 `-n/--dry-run` 全局参数。
 
 ### 新人一键最小落地（可选，推荐）
 
@@ -122,7 +99,7 @@ bash scripts/install-mac.sh
 - **Gemini**: \`~/.gemini/settings.json\` - 仅 \`mcpServers\` + \`mcp.allowed\`
 - **iFlow**: \`~/.iflow/settings.json\` - 仅 \`mcpServers\`
 - **Claude**: \`~/.claude/settings.json\` - 写 \`mcpServers\`；若缺项则命令兜底补齐
-- **Droid**: \`~/.factory/mcp.json\` - 仅 \`mcpServers\`；`mcp run --client droid` 将对所选集合执行“remove → add”强制对齐注册表。
+- **Droid**: \`~/.factory/mcp.json\` - 仅 \`mcpServers\`；在 `mcp run` 的交互中选择 Droid 后，会对所选集合执行“remove → add”强制对齐注册表。
 - **Cursor**: \`~/.cursor/mcp.json\` - 仅 \`mcpServers\`
 - **VS Code**: CLI 会按平台自动选择路径：
   - macOS: \`~/Library/Application Support/Code/User/mcp.json\` 与 \`~/Library/Application Support/Code - Insiders/User/mcp.json\`
@@ -148,27 +125,13 @@ mcp status claude
 mcp status cursor
 ```
 
-### pick
+### 交互入口
 
-交互式选择目标 CLI/IDE 与 MCP 集合并应用：
-
-```bash
-mcp pick
-```
+`mcp run` / `mcp clear` / `mcp central` 进入交互式选择与确认流程。
 
 ### run
 
-先按客户端应用集合，再执行启动命令：
-
-```bash
-mcp run --client <client> --servers <...> -- <启动命令...>
-```
-
-示例：
-```bash
-mcp run --client claude --servers context7,serena -- claude
-mcp run --client vscode-user --servers filesystem -- code .
-```
+运行后按提示选择客户端与要启用的 MCP 集合；可选输入要启动的命令，或直接回车跳过。
 
 ### check
 
@@ -182,19 +145,10 @@ mcp check
 
 ### clear
 
-一键清除所有 CLI/IDE 的 MCP 配置（支持定向某个客户端）：
-
-```bash
-# 清空全部客户端的 MCP 配置（包含 Claude 注册表）
-mcp clear -y
-
-# 仅清空某个客户端
-mcp clear --client codex -y
-```
+运行后按提示选择要清理的客户端并确认（支持环境变量 `MCP_CLEAR_YES=1` 自动确认）。
 
 说明：
-- 会对相关配置文件做时间戳备份；`-n/--dry-run` 仅预览将清理的目标。
-- 覆盖范围：Claude(文件+注册表)、Codex、Gemini、iFlow、Droid、Cursor、VS Code(User/Insiders)。
+- 会对相关配置文件做时间戳备份；覆盖范围：Claude(文件+注册表)、Codex、Gemini、iFlow、Droid、Cursor、VS Code(User/Insiders)。
 
 ## 配置验证
 

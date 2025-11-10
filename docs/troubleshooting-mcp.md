@@ -13,9 +13,9 @@
   - 首次安装（macOS/Linux）：`bash scripts/install-mac.sh`（不落地 MCP，仅渲染统一清单与体检）
   - 推荐日常：使用 `mcp` 按需落地而非全量同步：
     - 查看某客户端集合：`mcp status codex` / `mcp status claude`
-    - 仅对某个 CLI 下发：`mcp run --client claude --servers context7,serena`
-    - 下发后直接启动：`mcp run --client claude --servers context7,serena -- claude`
-    - 为 VS Code/Cursor 按需落地：`mcp run --client cursor --servers task-master-ai,context7` / `mcp run --client vscode-user --servers filesystem`
+    - 仅对某个 CLI 下发：运行 `mcp run`，在交互中选择目标客户端与所需服务
+    - 下发后直接启动：在 `mcp run` 交互最后输入启动命令（如 `claude`），或回车跳过
+    - 为 VS Code/Cursor 按需落地：运行 `mcp run`，交互中选择 Cursor/VS Code 并勾选服务
   - 可选脚本路径：`bash scripts/mcp-sync.sh` → `bash scripts/mcp-check.sh`（仅当你需要一次性全量落地时使用）
   - 每次落地前，脚本会生成时间戳备份（`*.YYYYMMDD_HHMMSS.backup`）。
 - 体检脚本改进点（已内置在本仓库）
@@ -75,7 +75,7 @@
 ### 2) Droid（factory.ai CLI）
 - 配置文件（官方）：`~/.factory/mcp.json` 顶层 `mcpServers`，项内 `command`、可选 `args`、`env`，常见 `type: stdio`。
 - 交互式 `/mcp` 与 `droid mcp add/remove` 操作同一注册表；通常文件更新会热加载，若未生效可重启会话。
-- 本项目行为：`mcp run --client droid --servers ...` 将“先 remove 再 add”强制对齐注册表，并同步写入 `mcpServers`，与中央清单保持一致。
+- 本项目行为：在 `mcp run` 中选择 Droid 后，会“先 remove 再 add”强制对齐注册表，并同步写入 `mcpServers`，与中央清单保持一致。
 - 注册写法（CLI）：
   - `droid mcp add <name> "<command and args>" [--env KEY=VAL ...]`
   - 例如（npx 最新版）：

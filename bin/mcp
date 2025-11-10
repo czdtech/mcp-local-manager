@@ -6,6 +6,11 @@ from __future__ import annotations
 import argparse, json, os, re, shutil, subprocess, sys, platform
 from pathlib import Path
 
+## 确保可导入顶层包（mcp_cli 等）
+_BASE = Path(__file__).resolve().parent.parent
+if str(_BASE) not in sys.path:
+    sys.path.insert(0, str(_BASE))
+
 # Import validation module with graceful fallback
 try:
     from mcp_validation import (
@@ -29,7 +34,7 @@ HOME = Path.home()
 CENTRAL = HOME/'.mcp-central'/'config'/'mcp-servers.json'
 
 # 全局开关：dry-run（仅预览，不落地）
-DRY_RUN = False
+# 交互版：不再支持全局 dry-run/verbose 参数
 
 def load_json(p: Path, default, error_context: str = ""):
     """Load JSON file with enhanced error handling.
@@ -262,130 +267,14 @@ def _vscode_insiders_path():
     return HOME/'.config'/'Code - Insiders'/'User'/'mcp.json'
 
 def cmd_status(args):
-    """显示 MCP 服务器状态，包括中央配置和各客户端的实际启用状态"""
-    try:
-        obj, servers = load_central_servers()
-    except Exception as e:
-        print(f"❌ 加载中央配置失败: {e}", file=sys.stderr)
-        print("⚠️  尝试使用默认配置继续...", file=sys.stderr)
-        servers = {}
-        obj = {}
-    
-    central_names = sorted(servers.keys())
-    print(f"📊 中央配置中的服务器数量: {len(central_names)}", file=sys.stderr)
-    
-    # 可选显示中央清单
-    if args.central:
-        list_servers()
-    
-    # 客户端/IDE 视图（可选过滤）
-    # 允许位置参数 client_pos 或 --client；并支持简写别名
-    sel = _normalize_client(getattr(args, 'client_pos', None)) or _normalize_client(args.client)
-    targets = [
-        ('claude-file', 'Claude(file)', lambda: _json_keys(HOME/'.claude'/'settings.json', 'mcpServers', 'Claude配置读取')),
-        ('claude-reg',  'Claude(register)', _claude_registered),
-        ('codex',       'Codex', _codex_keys),
-        ('gemini',      'Gemini', lambda: _json_keys(HOME/'.gemini'/'settings.json', 'mcpServers', 'Gemini配置读取')),
-        ('iflow',       'iFlow', lambda: _json_keys(HOME/'.iflow'/'settings.json', 'mcpServers', 'iFlow配置读取')),
-        ('droid',       'Droid', lambda: _json_keys(HOME/'.factory'/'mcp.json', 'mcpServers', 'Droid配置读取')),
-        ('cursor',      'Cursor', lambda: _json_keys(HOME/'.cursor'/'mcp.json', 'mcpServers', 'Cursor配置读取')),
-        ('vscode-user', 'VS Code(User)', lambda: _json_keys(_vscode_user_path(), 'servers', 'VS Code配置读取')),
-        ('vscode-ins',  'VS Code(Insiders)', lambda: _json_keys(_vscode_insiders_path(), 'servers', 'VS Code Insiders配置读取')),
-    ]
-    print("— 按客户端/IDE 的实际启用视图 —")
-    for key, label, fn in targets:
-        if sel and sel != key:
-            continue
-        try:
-            present = fn()
-            if args.verbose:
-                print(f"🔍 {label}: 找到 {len(present)} 个已配置服务器", file=sys.stderr)
-        except Exception as e:
-            if args.verbose:
-                print(f"⚠️  {label}: 读取配置时出错 - {e}", file=sys.stderr)
-            present = set()
-        _print_client(label, present, central_names)
+    # 委托模块实现（阶段一拆分）
+    from mcp_cli.commands import status as _status
+    return _status.run(args)
 
 def cmd_run(args):
-    # 先应用到指定客户端
-    subset = build_subset(args.servers.split(','))
-    if not subset:
-        print('[ERR] 服务器名无效或为空')
-        return 1
-    client = args.client
-    if client == 'claude':
-        rc = apply_claude(subset, verbose=getattr(args,'verbose',False))
-    elif client == 'codex':
-        rc = apply_codex(subset)
-    elif client == 'gemini':
-        rc = apply_json_map('Gemini', HOME/'.gemini'/'settings.json', subset, 'mcpServers')
-    elif client == 'iflow':
-        rc = apply_json_map('iFlow', HOME/'.iflow'/'settings.json', subset, 'mcpServers')
-    elif client == 'droid':
-        # 写入 ~/.factory/mcp.json 的 mcpServers，并“先 remove 再 add”强制对齐注册表
-        rc = apply_json_map('Droid', HOME/'.factory'/'mcp.json', subset, 'mcpServers')
-        want=set(subset.keys())
-        obj,_ = load_central_servers()
-        servers = obj.get('servers') or {}
-        if DRY_RUN:
-            print('[DRY-RUN] 将对齐 Droid 注册（预览：先 remove 再 add）')
-            print('  keys:', ', '.join(sorted(want)) if want else '(none)')
-            for n in sorted(want):
-                info = servers.get(n) or {}
-                cmd_str = ' '.join([_expand_tilde(info.get('command',''))] + [ _expand_tilde(str(a)) for a in (info.get('args') or []) ])
-                print('[DRY-RUN]', ' '.join(['droid','mcp','remove', n]))
-                cmd = ['droid','mcp','add', n, cmd_str]
-                for k,v in (info.get('env') or {}).items():
-                    cmd += ['--env', f'{k}={v}']
-                print('[DRY-RUN]', ' '.join(cmd))
-        else:
-            for n in sorted(want):
-                # 先移除，忽略错误
-                try:
-                    subprocess.run(['droid','mcp','remove', n], check=False, timeout=10)
-                except Exception:
-                    pass
-                # 再添加（droid 语法：droid mcp add <name> "<command and args>")
-                info = servers.get(n) or {}
-                cmd_str = ' '.join([_expand_tilde(info.get('command',''))] + [ _expand_tilde(str(a)) for a in (info.get('args') or []) ])
-                cmd = ['droid','mcp','add', n, cmd_str]
-                for k,v in (info.get('env') or {}).items():
-                    cmd += ['--env', f'{k}={v}']
-                try:
-                    if getattr(args,'verbose',False):
-                        print('[VERBOSE]', ' '.join(cmd))
-                    subprocess.run(cmd, check=False, timeout=30)
-                except Exception:
-                    pass
-    elif client == 'cursor':
-        rc = apply_json_map('Cursor', HOME/'.cursor'/'mcp.json', subset, 'mcpServers')
-    elif client == 'vscode-user':
-        rc = apply_json_map('VS Code(User)', _vscode_user_path(), subset, 'servers')
-    elif client == 'vscode-insiders':
-        rc = apply_json_map('VS Code(Insiders)', _vscode_insiders_path(), subset, 'servers')
-    else:
-        print('[ERR] 未知 client')
-        return 2
-    
-    if isinstance(rc, int) and rc != 0:
-        return rc
-    # 执行命令
-    exec_cmd = args.exec or []
-    while exec_cmd and exec_cmd[0] == '--':
-        exec_cmd.pop(0)
-    if not exec_cmd:
-        # 默认映射：claude -> ['claude']
-        if args.client.startswith('claude'):
-            exec_cmd = ['claude']
-        elif args.client == 'codex':
-            exec_cmd = ['codex']
-    if not exec_cmd:
-        print('[OK] 已应用所选集合；未提供启动命令，结束。')
-        return 0
-    if DRY_RUN:
-        print('[DRY-RUN] 将执行命令（预览）：', ' '.join(exec_cmd))
-        return 0
-    os.execvp(exec_cmd[0], exec_cmd)
+    from mcp_cli.commands import run as _run
+    setattr(args, '_dry_run', False)
+    return _run.run(args)
 
 ## 已移除：cmd_on/cmd_off/cmd_only（中央清单开关不再作为入口）
 
@@ -399,81 +288,35 @@ def cmd_sync(args):
     rc = subprocess.call([sys.executable, str(sync_py), 'sync'])
     sys.exit(rc)
 
+def cmd_central(args):
+    from mcp_cli.commands import central as _central
+    setattr(args, '_dry_run', False)
+    return _central.run(args)
+
 def cmd_check(args):
-    # 轻量版只读体检：避免在无依赖环境中卡住；需要更深入体检时可直接运行 scripts/mcp-check.sh
-    print('MCP 健康检查报告')
-    # 展示中央清单位置与关键路径存在性
-    print(f"- 中央清单: {CENTRAL}")
-    for label, path in [
-        ('Claude 文件', HOME/'.claude'/'settings.json'),
-        ('Codex TOML', HOME/'.codex'/'config.toml'),
-        ('Gemini 文件', HOME/'.gemini'/'settings.json'),
-        ('iFlow 文件', HOME/'.iflow'/'settings.json'),
-        ('Droid 文件', HOME/'.factory'/'mcp.json'),
-        ('Cursor 文件', HOME/'.cursor'/'mcp.json'),
-        ('VS Code(User)', _vscode_user_path()),
-        ('VS Code(Insiders)', _vscode_insiders_path()),
-    ]:
-        state = '存在' if path.exists() else '缺失'
-        print(f"  [INFO] {label}: {path} ({state})")
-    print('\n结论: 最小体检完成（如需深度体检，请执行 scripts/mcp-check.sh）')
-    return 0
+    # 委托模块实现（阶段一拆分）
+    from mcp_cli.commands import check as _check
+    return _check.run(args)
 
 def build_subset(names):
-    obj, servers = load_central_servers()
-    sel = {}
-    for n in names:
-        if n in servers:
-            sel[n] = servers[n]
-    return sel
+    from mcp_cli.commands.run import build_subset as _bs
+    return _bs(names)
 
 def _strip_toml_mcp_servers_block(text: str) -> str:
-    """从 Codex 的 config.toml 中移除所有 [mcp_servers.*] 段落与我们写入的标记块。"""
-    text = re.sub(r"\n*# === MCP Servers 配置（由 MCP (?:Local Manager|Central) 生成）===\n(?:.|\n)*?(?=\n?# ===|\Z)", "\n", text)
-    text = re.sub(r"(?ms)^\[mcp_servers\.[^\]]+\][\s\S]*?(?=^\[|\Z)", "", text)
-    return text
+    # 已迁移到 mcp_cli.utils.strip_toml_mcp_servers_block，保留向后兼容
+    from mcp_cli.utils import strip_toml_mcp_servers_block as _s
+    return _s(text)
 
 def apply_codex(subset):
-    p = HOME/'.codex'/'config.toml'
-    if not p.exists():
-        print(f"[ERR] Codex 配置不存在: {p}")
-        return 1
-    keys = sorted(list(subset.keys()))
-    if DRY_RUN:
-        print(f"[DRY-RUN] 将应用到 Codex: {p}")
-        print("  keys:", ', '.join(keys) if keys else '(none)')
-        return 0
-    backup(p)
-    text = p.read_text(encoding='utf-8')
-    # 清理旧块 + 所有 [mcp_servers.*]
-    text = _strip_toml_mcp_servers_block(text)
-    lines = ["\n# === MCP Servers 配置（由 MCP Local Manager 生成）==="]
-    for name,info in subset.items():
-        lines.append(f"\n[mcp_servers.{name}]")
-        # Codex: 增加启动超时，避免默认 10s 超时（npx 首次拉取较慢）
-        lines.append("startup_timeout_sec = 60")
-        lines.append(f"command = \"{info.get('command','')}\"")
-        args = info.get('args') or []
-        if args:
-            lines.append('args = ' + json.dumps(args))
-        env = info.get('env') or {}
-        if env:
-            lines.append(f"\n[mcp_servers.{name}.env]")
-            for k,v in env.items():
-                lines.append(f"{k} = \"{v}\"")
-    new_block='\n'.join(lines)+"\n"
-    p.write_text(text.rstrip()+"\n"+new_block, encoding='utf-8')
-    print(f"[OK] 已应用到 Codex: {p}")
-    return 0
+    from mcp_cli.commands.run import apply_codex as _ac
+    return _ac(subset, dry_run=False)
 
 def _clear_json_map(label: str, path: Path, top_key='mcpServers', extra: str|None=None):
     """将 JSON 配置中的 MCP 节点清空（并备份）。
     - top_key 为 'servers' 或 'mcpServers' 等
     - extra 可选：例如 'gemini.allowed'，会额外清空
     """
-    if DRY_RUN:
-        print(f"[DRY-RUN] 将清空 {label} 的配置: {path}")
-        return 0
+    # 交互模式不再支持 CLI dry-run；预览在交互里完成
     if not path.exists():
         print(f"[INFO] 跳过 {label}（配置不存在）: {path}")
         return 0
@@ -493,9 +336,6 @@ def _clear_json_map(label: str, path: Path, top_key='mcpServers', extra: str|Non
 
 def _clear_claude_registry(verbose: bool=False):
     """移除 Claude CLI 的 mcp 注册表条目。"""
-    if DRY_RUN:
-        print('[DRY-RUN] 将清空 Claude 注册表（预览，跳过 `claude mcp list`）')
-        return 0
     try:
         out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=30)
         text = (out.stdout or '') + "\n" + (out.stderr or '')
@@ -508,10 +348,6 @@ def _clear_claude_registry(verbose: bool=False):
     if not names:
         if verbose:
             print('[INFO] Claude 注册表无条目需清理')
-        return 0
-    if DRY_RUN:
-        for n in names:
-            print('[DRY-RUN]', 'claude mcp remove', n)
         return 0
     ok=0; fail=0
     for n in names:
@@ -528,173 +364,17 @@ def _clear_claude_registry(verbose: bool=False):
     return 0
 
 def cmd_clear(args):
-    """一键清除所有 CLI/IDE 的 MCP 配置。"""
-    targets = []
-    which = getattr(args,'client',None) or 'all'
-    if which == 'all':
-        targets = ['claude','codex','gemini','iflow','droid','cursor','vscode-user','vscode-insiders']
-    else:
-        targets = [which]
-
-    if not getattr(args,'yes',False):
-        tag = ', '.join(targets)
-        try:
-            reply = 'y' if os.environ.get('MCP_CLEAR_YES') == '1' else input(f"将清空以下客户端的 MCP 配置 [{tag}]，确认? [y/N]: ").strip().lower()
-        except EOFError:
-            reply = 'n'
-        if reply != 'y':
-            print('已取消')
-            return 0
-
-    for t in targets:
-        try:
-            if t == 'claude':
-                _clear_json_map('Claude(文件)', HOME/'.claude'/'settings.json', 'mcpServers')
-                _clear_claude_registry(verbose=getattr(args,'verbose',False))
-            elif t == 'codex':
-                p = HOME/'.codex'/'config.toml'
-                if DRY_RUN:
-                    print(f"[DRY-RUN] 将清理 Codex 配置: {p}")
-                else:
-                    if not p.exists():
-                        print(f"[INFO] 跳过 Codex（配置不存在）: {p}")
-                    else:
-                        backup(p)
-                        text = p.read_text(encoding='utf-8')
-                        new_text = _strip_toml_mcp_servers_block(text)
-                        p.write_text(new_text, encoding='utf-8')
-                        print(f"[OK] 已清空 Codex: {p}")
-            elif t == 'gemini':
-                _clear_json_map('Gemini', HOME/'.gemini'/'settings.json', 'mcpServers', extra='gemini.allowed')
-            elif t == 'iflow':
-                _clear_json_map('iFlow', HOME/'.iflow'/'settings.json', 'mcpServers')
-            elif t == 'droid':
-                _clear_json_map('Droid', HOME/'.factory'/'mcp.json', 'mcpServers')
-            elif t == 'cursor':
-                _clear_json_map('Cursor', HOME/'.cursor'/'mcp.json', 'mcpServers')
-            elif t == 'vscode-user':
-                _clear_json_map('VS Code(User)', _vscode_user_path(), 'servers')
-            elif t == 'vscode-insiders':
-                _clear_json_map('VS Code(Insiders)', _vscode_insiders_path(), 'servers')
-        except Exception as e:
-            print(f"[WARN] 清理 {t} 失败: {e}")
-    print('[OK] 清理完成')
-    return 0
+    from mcp_cli.commands import clear as _clear
+    setattr(args, '_dry_run', False)
+    return _clear.run(args)
 
 def apply_json_map(label, path: Path, subset: dict, top_key='mcpServers'):
-    obj = load_json(path, {})
-    keys = sorted(list((subset or {}).keys()))
-    if DRY_RUN:
-        print(f"[DRY-RUN] 将应用到 {label}: {path}")
-        print("  keys:", ', '.join(keys) if keys else '(none)')
-        return 0
-    
-    # Droid: 写入 ~/.factory/mcp.json 顶层 mcpServers（官方格式）
-    if label == 'Droid':
-        # 只保留标准格式
-        obj = {}
-        servers_config = {}
-        for name, info in subset.items():
-            server_config = {}
-            if 'command' in info:
-                server_config['command'] = info['command']
-            if 'args' in info:
-                server_config['args'] = info['args']
-            if 'env' in info and info['env']:
-                server_config['env'] = info['env']
-            # 显式 stdio，兼容 Bridge/CLI 文档
-            server_config['type'] = 'stdio'
-            servers_config[name] = server_config
-        obj['mcpServers'] = servers_config
-    elif top_key == 'servers':
-        obj['servers'] = subset
-    else:
-        obj[top_key] = subset
-        if label == 'Gemini':
-            obj.setdefault('mcp', {})['allowed'] = sorted(subset.keys())
-    
-    backup(path)
-    save_json(path, obj)
-    print(f"[OK] 已应用到 {label}: {path}")
-    return 0
+    from mcp_cli.commands.run import apply_json_map as _aj
+    return _aj(label, path, subset, top_key, dry_run=False)
 
 def apply_claude(subset, verbose: bool=False):
-    # 文件端
-    apply_json_map('Claude(文件)', HOME/'.claude'/'settings.json', subset, 'mcpServers')
-    # 注册表端：移除多余，补齐缺失
-    if DRY_RUN:
-        # 仅预览将要执行的注册表命令，不实际调用 `claude mcp`
-        obj,_ = load_central_servers()
-        servers = obj.get('servers') or {}
-        want = sorted(subset.keys())
-        print('[DRY-RUN] 将对齐 Claude 注册表（预览）')
-        print('  keys:', ', '.join(want) if want else '(none)')
-        for n in want:
-            info = servers.get(n) or {}
-            cmd = ['claude','mcp','add','--transport','stdio', n]
-            for k,v in (info.get('env') or {}).items():
-                cmd += ['-e', f'{k}={v}']
-            cmd += ['--', _expand_tilde(info.get('command',''))]
-            cmd += [ _expand_tilde(str(a)) for a in (info.get('args') or []) ]
-            # 总是输出将要执行的命令（简洁预览），详细标记由 -v 控制
-            print('[DRY-RUN]', ' '.join(cmd))
-        print('  注：dry-run 不会执行 `claude mcp list/remove/add`')
-        return 0
-    try:
-        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=30)
-        have=set()
-        text = (out.stdout or '') + "\n" + (out.stderr or '')
-        for line in text.splitlines():
-            if ':' in line:
-                have.add(line.split(':',1)[0].strip())
-    except Exception:
-        have=set()
-    want=set(subset.keys())
-    # 先移除多余
-    remove_ok=[]; remove_fail=[]
-    for n in sorted(have-want):
-        try:
-            cmd_rm = ['claude','mcp','remove',n]
-            if verbose:
-                print('[VERBOSE]', ' '.join(cmd_rm))
-            r = subprocess.run(cmd_rm, check=False, timeout=10)
-            (remove_ok if r.returncode==0 else remove_fail).append(n)
-        except Exception:
-            remove_fail.append(n)
-    # 再“强制重注册”目标集合，确保命令/参数与中央清单一致
-    obj,_ = load_central_servers()
-    servers = obj.get('servers') or {}
-    add_ok=[]; add_fail=[]
-    for n in sorted(want):
-        info = servers.get(n) or {}
-        # 先尝试移除旧记录，忽略错误
-        try:
-            subprocess.run(['claude','mcp','remove',n], check=False, timeout=10)
-        except Exception:
-            pass
-        # 重新添加为 stdio + 中央清单命令
-        cmd = ['claude','mcp','add','--transport','stdio', n]
-        for k,v in (info.get('env') or {}).items():
-            cmd += ['-e', f'{k}={v}']
-        # 展开路径
-        cmd += ['--', _expand_tilde(info.get('command',''))]
-        cmd += [ _expand_tilde(str(a)) for a in (info.get('args') or []) ]
-        try:
-            if verbose:
-                print('[VERBOSE]', ' '.join(cmd))
-            r = subprocess.run(cmd, check=False, timeout=45)
-            (add_ok if r.returncode==0 else add_fail).append(n)
-        except Exception:
-            add_fail.append(n)
-    # 汇总
-    total_add = len(add_ok)+len(add_fail)
-    total_rm = len(remove_ok)+len(remove_fail)
-    print('[OK] Claude 注册表已与所选集合对齐')
-    if total_rm:
-        print(f"  remove: ok={len(remove_ok)} fail={len(remove_fail)}" + (f"; failed=[{', '.join(remove_fail)}]" if remove_fail else ''))
-    if total_add:
-        print(f"  add   : ok={len(add_ok)} fail={len(add_fail)}" + (f"; failed=[{', '.join(add_fail)}]" if add_fail else ''))
-    return 0
+    from mcp_cli.commands.run import apply_claude as _acl
+    return _acl(subset, verbose=verbose, dry_run=False)
 
 def cmd_pick(args):
     # 简易交互：数字选择客户端 + 多选服务
@@ -735,9 +415,24 @@ def cmd_pick(args):
     return cmd_run(argparse.Namespace(client=client, servers=','.join(chosen), exec=[]))
 
 def main():
-    p = argparse.ArgumentParser(prog='mcp', description='MCP 配置集/开关与按客户端落地（已移除 nvm 相关功能）')
-    p.add_argument('-v','--verbose', action='store_true', help='显示更详细的命令与执行信息')
-    p.add_argument('-n','--dry-run', action='store_true', help='仅预览：不写入文件、不运行 `claude mcp`、不执行目标命令')
+    p = argparse.ArgumentParser(
+        prog='mcp',
+        formatter_class=__import__('argparse').RawTextHelpFormatter,
+        description=(
+            '交互优先的 MCP 管理工具\n'
+            '操作心法: 运行命令 -> 按数字选择 -> 查看变更摘要 -> 确认写入\n'
+            '小贴士: 输入 ? 查看建议; 输入 0 返回上一级; 回车使用默认/跳过'
+        ),
+        epilog=(
+            '常用入口:\n'
+            '  - mcp run      进入交互式向导, 按客户端落地所选 MCP (最后可选启动)\n'
+            '  - mcp clear    进入交互式向导, 清理各客户端 MCP 配置 (含 Claude 注册表)\n'
+            '  - mcp central  进入交互式向导, 管理中央清单 (CRUD/模板/导入导出/校验/体检)\n'
+            '只读命令:\n'
+            '  - mcp status [client]  查看按客户端/IDE 的实际启用状态\n'
+            '  - mcp check            轻量体检 (不改动配置)\n'
+        ),
+    )
     sub = p.add_subparsers(dest='cmd', required=True)
 
     sp_st = sub.add_parser('status', help='查看按客户端/IDE 的实际启用状态；也可用：mcp status codex')
@@ -751,28 +446,114 @@ def main():
     # 已移除：profile-save / profile-apply
     # （已移除 apply-cli 子命令）
 
-    sp_pick = sub.add_parser('pick', help='交互式选择目标 CLI 与服务器集合并应用')
-    sp_pick.add_argument('-v','--verbose', action='store_true', help='显示更详细的命令与执行信息（仅部分 client 生效）')
+    sp_pick = sub.add_parser('pick', help=__import__('argparse').SUPPRESS)
     sp_pick.set_defaults(func=cmd_pick)
 
     # 已移除：sync（全量同步）
-    sp_run = sub.add_parser('run', help='按客户端应用集合后启动命令，例如：mcp run --client claude --servers context7,serena -- claude')
-    sp_run.add_argument('--client', required=True, choices=['claude','codex','gemini','iflow','droid','cursor','vscode-user','vscode-insiders'])
-    sp_run.add_argument('--servers', required=True, help='以逗号分隔的服务器名')
-    sp_run.add_argument('exec', nargs=argparse.REMAINDER, help='在 -- 之后的启动命令')
+    sp_run = sub.add_parser('run', help='交互式下发所需 MCP；步骤：选择客户端 → 选择服务 → 确认写入 → 可选启动')
     sp_run.set_defaults(func=cmd_run)
+    # 旧版 central 定义块已移除（统一使用新版 central 定义）
+
     sub.add_parser('check', help='只读体检').set_defaults(func=cmd_check)
 
     # 新增：clear 一键清除所有 CLI/IDE 的 MCP 配置
-    sp_clear = sub.add_parser('clear', help='一键清除所有 CLI/IDE 的 MCP 配置（支持 --client 定向）')
-    sp_clear.add_argument('--client', choices=['claude','codex','gemini','iflow','droid','cursor','vscode-user','vscode-insiders','all'], default='all', help='指定仅清理某个客户端，默认 all')
-    sp_clear.add_argument('-y','--yes', action='store_true', help='跳过确认')
-    sp_clear.add_argument('-v','--verbose', action='store_true', help='显示更详细的执行信息')
+    sp_clear = sub.add_parser('clear', help='交互式清理各客户端 MCP 配置（含 Claude 注册表；写入前有摘要与确认）')
     sp_clear.set_defaults(func=cmd_clear)
 
+    # central：管理中央清单
+    sp_central = sub.add_parser('central', help='交互式管理中央 MCP 清单（新增/更新/模板/导入导出/校验/体检）')
+    sc = sp_central.add_subparsers(dest='central_cmd', required=False)
+    # list
+    sc_list = sc.add_parser('list', help='列出所有服务')
+    sc_list.add_argument('--json', action='store_true', help='JSON 输出')
+    sc_list.add_argument('-i','--interactive', action='store_true', help='交互选择')
+    # show
+    sc_show = sc.add_parser('show', help='查看某个服务完整配置')
+    sc_show.add_argument('name', nargs='?')
+    sc_show.add_argument('--json', action='store_true')
+    sc_show.add_argument('-i','--interactive', action='store_true')
+    # add
+    sc_add = sc.add_parser('add', help='新增服务')
+    sc_add.add_argument('name', nargs='?')
+    sc_add.add_argument('--command')
+    sc_add.add_argument('--args', nargs='+')
+    sc_add.add_argument('--env', nargs='*', help='KEY=VAL ...')
+    sc_add.add_argument('--headers', nargs='*', help='K=V ...')
+    sc_add.add_argument('--type')
+    sc_add.add_argument('--url')
+    sc_add.add_argument('--enabled', type=lambda x: x.lower()=='true')
+    sc_add.add_argument('--json', action='store_true')
+    sc_add.add_argument('-i','--interactive', action='store_true')
+    # update
+    sc_upd = sc.add_parser('update', help='更新服务字段')
+    sc_upd.add_argument('name', nargs='?')
+    sc_upd.add_argument('--rename')
+    sc_upd.add_argument('--command')
+    sc_upd.add_argument('--type')
+    sc_upd.add_argument('--url')
+    sc_upd.add_argument('--enabled', type=lambda x: x.lower()=='true')
+    sc_upd.add_argument('--prepend-arg', nargs='*')
+    sc_upd.add_argument('--append-arg', nargs='*')
+    sc_upd.add_argument('--remove-arg', nargs='*')
+    sc_upd.add_argument('--set-env', nargs='*', help='KEY=VAL ...')
+    sc_upd.add_argument('--unset-env', nargs='*')
+    sc_upd.add_argument('--set-header', nargs='*', help='K=V ...')
+    sc_upd.add_argument('--unset-header', nargs='*')
+    sc_upd.add_argument('--json', action='store_true')
+    sc_upd.add_argument('-i','--interactive', action='store_true')
+    # remove
+    sc_rm = sc.add_parser('remove', help='删除服务')
+    sc_rm.add_argument('name', nargs='?')
+    sc_rm.add_argument('--json', action='store_true')
+    sc_rm.add_argument('-i','--interactive', action='store_true')
+    # enable/disable
+    sc_en = sc.add_parser('enable', help='启用服务')
+    sc_en.add_argument('name', nargs='?')
+    sc_en.add_argument('--json', action='store_true')
+    sc_en.add_argument('-i','--interactive', action='store_true')
+    sc_dis = sc.add_parser('disable', help='禁用服务')
+    sc_dis.add_argument('name', nargs='?')
+    sc_dis.add_argument('--json', action='store_true')
+    sc_dis.add_argument('-i','--interactive', action='store_true')
+    # export
+    sc_exp = sc.add_parser('export', help='导出 central JSON（默认 stdout）')
+    sc_exp.add_argument('--file')
+    sc_exp.add_argument('--json', action='store_true')
+    sc_exp.add_argument('-i','--interactive', action='store_true')
+    # import
+    sc_imp = sc.add_parser('import', help='导入 central JSON（默认 merge）')
+    sc_imp.add_argument('--file')
+    sc_imp.add_argument('--replace', action='store_true', help='用导入内容替换现有')
+    sc_imp.add_argument('--prefer-incoming', action='store_true', help='merge 冲突时偏向导入项')
+    sc_imp.add_argument('--json', action='store_true')
+    sc_imp.add_argument('-i','--interactive', action='store_true')
+    # template
+    sc_tpl = sc.add_parser('template', help='用模板创建')
+    sc_tpl.add_argument('template', nargs='?')
+    sc_tpl.add_argument('--name')
+    sc_tpl.add_argument('--from', dest='from_path')
+    sc_tpl.add_argument('--command')
+    sc_tpl.add_argument('--args', nargs='*')
+    sc_tpl.add_argument('--env', nargs='*')
+    sc_tpl.add_argument('--json', action='store_true')
+    sc_tpl.add_argument('-i','--interactive', action='store_true')
+    # dup
+    sc_dup = sc.add_parser('dup', help='复制服务')
+    sc_dup.add_argument('src', nargs='?')
+    sc_dup.add_argument('dest', nargs='?')
+    sc_dup.add_argument('--json', action='store_true')
+    sc_dup.add_argument('-i','--interactive', action='store_true')
+    # validate
+    sc_val = sc.add_parser('validate', help='校验 central 配置')
+    sc_val.add_argument('--json', action='store_true')
+    # doctor
+    sc_doc = sc.add_parser('doctor', help='只读体检（不联网）')
+    sc_doc.add_argument('--json', action='store_true')
+
+    # 复用上方已定义的 cmd_central
+    sp_central.set_defaults(func=cmd_central)
+
     args = p.parse_args()
-    global DRY_RUN
-    DRY_RUN = bool(getattr(args, 'dry_run', False))
     rc = args.func(args)
     if isinstance(rc, int):
         sys.exit(rc)
