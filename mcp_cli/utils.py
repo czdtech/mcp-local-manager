@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+"""通用工具与平台/路径/注册表探测函数。
+
+仅供 mcp_cli.commands.* 调用；保持纯函数或可预测副作用，便于单测。
+"""
+
+import json
+import os
+import platform
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Dict, Optional, Set, Tuple
+
+# HOME/CENTRAL 由 Path.home() 推导，受环境变量 HOME 影响，测试已隔离
+HOME = Path.home()
+CENTRAL = HOME/'.mcp-central'/'config'/'mcp-servers.json'
+
+# 校验模块（可选）
+try:
+    from mcp_validation import (
+        validate_mcp_servers_config,
+        MCPValidationError,
+        MCPSchemaError,
+        MCPConfigError,
+        format_validation_error,
+    )
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    VALIDATION_AVAILABLE = False
+    def validate_mcp_servers_config(config_path): return {}
+    class MCPValidationError(Exception): pass
+    class MCPSchemaError(Exception): pass
+    class MCPConfigError(Exception): pass
+    def format_validation_error(error): return f"❌ 配置错误: {str(error)}"
+
+
+def load_json(p: Path, default: Any, error_context: str = "") -> Any:
+    if not p.exists():
+        return default
+    try:
+        content = p.read_text(encoding='utf-8')
+        if not content.strip():
+            if error_context:
+                print(f"⚠️ 警告: {error_context} - 文件为空: {p}", file=sys.stderr)
+            return default
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        if error_context:
+            print(f"❌ {error_context} - JSON 解析错误: {p}", file=sys.stderr)
+            print(f"   错误位置: 行 {e.lineno}, 列 {e.colno}", file=sys.stderr)
+            if e.msg:
+                print(f"   错误信息: {e.msg}", file=sys.stderr)
+        return default
+    except Exception as e:
+        if error_context:
+            print(f"❌ {error_context} - 读取文件失败: {p}", file=sys.stderr)
+            print(f"   错误信息: {e}", file=sys.stderr)
+        return default
+
+
+def save_json(p: Path, obj: Dict[str, Any]) -> None:
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+def backup(p: Path) -> Optional[Path]:
+    if not p.exists():
+        return None
+    ts = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
+    b = p.with_suffix(f'.{ts}.backup')
+    shutil.copy2(p, b)
+    return b
+
+
+def _is_macos() -> bool:
+    v = os.environ.get('MCP_OS')
+    if v:
+        return v.lower() in ('darwin','mac','macos','osx')
+    return platform.system() == 'Darwin'
+
+
+def _vscode_user_path() -> Path:
+    if _is_macos():
+        return HOME/'Library'/'Application Support'/'Code'/'User'/'mcp.json'
+    return HOME/'.config'/'Code'/'User'/'mcp.json'
+
+
+def _vscode_insiders_path() -> Path:
+    if _is_macos():
+        return HOME/'Library'/'Application Support'/'Code - Insiders'/'User'/'mcp.json'
+    return HOME/'.config'/'Code - Insiders'/'User'/'mcp.json'
+
+
+def _json_keys(path: Path, pref_key: str = 'mcpServers', error_context: str = "") -> Set[str]:
+    obj = load_json(path, {}, error_context or f"读取 {path.name} 配置")
+    if isinstance(obj.get(pref_key), dict):
+        return set(obj[pref_key].keys())
+    if isinstance(obj.get('servers'), dict):
+        return set(obj['servers'].keys())
+    return set()
+
+
+def strip_toml_mcp_servers_block(text: str) -> str:
+    """移除 Codex config.toml 中我们写入的 MCP 段与所有 [mcp_servers.*] 段。"""
+    text = re.sub(r"\n*# === MCP Servers 配置（由 MCP (?:Local Manager|Central) 生成）===\n(?:.|\n)*?(?=\n?# ===|\Z)", "\n", text)
+    text = re.sub(r"(?ms)^\[mcp_servers\.[^\]]+\][\s\S]*?(?=^\[|\Z)", "", text)
+    return text
+
+
+def _codex_keys() -> Set[str]:
+    p = HOME/'.codex'/'config.toml'
+    if not p.exists():
+        return set()
+    try:
+        import tomllib
+        conf = tomllib.loads(p.read_text(encoding='utf-8'))
+        m = conf.get('mcp_servers', {}) or {}
+        return {k for k in m.keys() if not k.endswith('.env')}
+    except Exception:
+        names = set()
+        for line in p.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            m = re.match(r"^\[mcp_servers\.([^\]]+)\]$", line)
+            if m:
+                name = m.group(1)
+                if not name.endswith('.env'):
+                    names.add(name)
+        return names
+
+
+def _claude_registered() -> Set[str]:
+    try:
+        t = float(os.environ.get('CLAUDE_LIST_TIMEOUT', '3'))
+        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=t)
+        text = (out.stdout or '') + "\n" + (out.stderr or '')
+        reg = set()
+        for line in text.splitlines():
+            if ':' in line:
+                reg.add(line.split(':',1)[0].strip())
+        return reg
+    except Exception:
+        return set()
+
+
+def _print_client(label: str, present: Set[str] | list[str], universe: Set[str] | list[str]) -> None:
+    present = sorted(present)
+    absent = sorted(set(universe) - set(present))
+    print(f"\n[{label}]")
+    print("  on : "+ (', '.join(present) if present else '无'))
+    print("  off: "+ (', '.join(absent) if absent else '无'))
+
+
+def _normalize_client(alias: Optional[str]) -> Optional[str]:
+    if not alias:
+        return None
+    a = alias.strip().lower()
+    mapping = {
+        'claude': 'claude-file',
+        'claude-file': 'claude-file',
+        'claude-reg': 'claude-reg',
+        'codex': 'codex',
+        'gemini': 'gemini',
+        'iflow': 'iflow',
+        'droid': 'droid',
+        'cursor': 'cursor',
+        'vscode': 'vscode-user',
+        'vscode-user': 'vscode-user',
+        'vscode-insiders': 'vscode-ins',
+        'vscode-ins': 'vscode-ins',
+        'insiders': 'vscode-ins',
+    }
+    return mapping.get(a)
+
+
+def load_central_servers() -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    validation_passed = False
+    obj = {}
+    if VALIDATION_AVAILABLE and CENTRAL.exists():
+        try:
+            obj = validate_mcp_servers_config(CENTRAL)
+            validation_passed = True
+        except (MCPValidationError, MCPSchemaError) as e:
+            print(format_validation_error(e), file=sys.stderr)
+            print("⚠️  警告: Schema 验证失败，使用基本 JSON 解析（功能可能受限）", file=sys.stderr)
+            obj = load_json(CENTRAL, {}, "中央配置验证失败")
+        except Exception as e:
+            print(f"❌ 验证过程发生未知错误: {e}", file=sys.stderr)
+            print("⚠️  警告: 使用基本 JSON 解析", file=sys.stderr)
+            obj = load_json(CENTRAL, {}, "中央配置验证异常")
+    else:
+        obj = load_json(CENTRAL, {}, "中央配置加载")
+
+    servers = obj.get('servers') or {}
+    if not isinstance(servers, dict):
+        print("❌ 错误: 'servers' 字段必须是对象格式", file=sys.stderr)
+        servers = {}
+
+    if VALIDATION_AVAILABLE and validation_passed:
+        from mcp_validation import validate_server_config
+        for server_name, server_info in servers.items():
+            try:
+                validate_server_config(server_name, server_info)
+            except MCPValidationError as e:
+                print(f"⚠️  服务器配置警告 - {server_name}: {e}", file=sys.stderr)
+
+    return obj, servers
+
+
+def list_servers() -> None:
+    obj, servers = load_central_servers()
+    rows = []
+    for n, v in sorted(servers.items()):
+        en = bool(v.get('enabled', True))
+        cmd = v.get('command','')
+        rows.append((n, 'on' if en else 'off', cmd))
+    print("中央清单（启用开关与命令路径）")
+    print("name                        state  command")
+    print("-"*60)
+    for n,st,cmd in rows:
+        print(f"{n:26} {st:5}  {cmd}")

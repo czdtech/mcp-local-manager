@@ -54,7 +54,8 @@ PY
 fi
 
 echo "[3/6] 仅为 Cursor 落地两项 ..."
-mcp run --client cursor --servers context7,task-master-ai
+echo "[info] 进入交互选择，将 Cursor 下发所需 MCP："
+mcp run
 
 echo "[4/6] 清空其它 CLI/IDE（裸奔）..."
 clean_json(){

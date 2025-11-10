@@ -57,7 +57,7 @@ main() {
   ensure_central
   install_mcp
   log "完成。下一步建议："
-  printf "\n- 仅对 Claude 下发并启动：\n  mcp run --client claude --servers context7,serena -- claude\n"
+  printf "\n- 交互下发并可选启动：\n  mcp run\n"
   printf "- 查看某个客户端集合：\n  mcp status codex  # 或 claude / vscode / cursor\n\n"
 }
 

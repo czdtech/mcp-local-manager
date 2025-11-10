@@ -17,16 +17,7 @@ bash scripts/onboard-cursor-minimal.sh
 mcp status cursor
 ```
 
-若需对某 CLI 临时下发少量服务，请使用：
-
-```
-mcp run --client <cli> --servers context7,task-master-ai
-```
-
-仅预览（不写入）：可在任何命令加 `-n/--dry-run`，例如：
-```
-mcp run -n --client claude --servers context7,serena
-```
+需要临时下发少量服务时，直接运行 `mcp run` 进入交互选择客户端与服务集合；写入前会显示变更摘要并确认。
 ```
 cd mcp-local-manager
 bash scripts/install-mac.sh
@@ -38,20 +29,7 @@ bash scripts/install-mac.sh
   - 运行健康检查并输出结论
 
 ## 每次启动 CLI/IDE 前（推荐）
-优先用 mcp 按需下发，避免一次性加载全部服务：
-```
-# 例：Claude 只启用 context7+serena
-mcp run --client claude --servers context7,serena -- claude
-
-# 或者仅下发不启动：
-mcp run --client claude --servers context7,serena
-
-# IDE（VS Code/Cursor）建议按需启用少量（示例：Cursor 只启用 task-master-ai + context7）：
-mcp run --client cursor --servers task-master-ai,context7
-
-# 查看当前集合：
-mcp status codex   # 或 claude/vscode/cursor
-```
+优先用 `mcp run` 交互式按需下发，避免一次性加载全部服务；`mcp status` 可查看当前集合。
 
 ## 统一来源位置
 - `~/.mcp-central/config/mcp-servers.json`

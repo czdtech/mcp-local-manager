@@ -130,11 +130,11 @@ npx -y @playwright/mcp@latest \
 - 名称重复/大小写不一致：统一成小写-连字符；清理历史注册项（Claude/Droid）。
 - PATH/二进制差异：必要时在 `env.PATH` 显式包含 Node bin 与系统路径；优先绝对路径。
 - 只想查看单一客户端状态：用 `mcp status codex|claude|vscode|cursor`，而不是读中央清单。
-- 启动前只加载少量 MCP：用 `mcp run --client <cli> --servers <list> -- <启动命令>`。
+- 启动前只加载少量 MCP：运行 `mcp run`，在交互中仅勾选需要的服务；如需启动，在最后一步输入启动命令；直接回车仅落地不启动。
 
 提示（dry-run 预览变更）：
-- 在 `mcp` 任意子命令追加 `-n/--dry-run` 可只预览将发生的写入/注册/启动动作，不做任何修改。
-- 示例：`mcp run -n --client claude --servers context7,serena`、`mcp run -n --client claude --servers context7,serena -- claude`。
+- 预览与确认：已内置在交互步骤中，无需 `-n/--dry-run` 参数。
+  示例：运行 `mcp run` → 选择 `claude` → 勾选 `context7, serena` → 确认写入 → 需要时输入 `claude` 启动。
 
 ---
 

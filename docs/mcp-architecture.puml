@@ -7,7 +7,7 @@ rectangle "mcp-auto-sync.py\n(~/.mcp-central/bin)" as SYNC
 
 CENTRAL -down-> SYNC : 单一来源
 CENTRAL -right-> MCP : 按客户端落地
-rectangle "mcp\nstatus/pick/run" as MCP
+rectangle "mcp\nstatus/check/central (interactive)" as MCP
 
 package "目标配置 (仅写 MCP 段)" {
   rectangle "Codex\n~/.codex/config.toml\n[mcp_servers.*]" as CODEX
@@ -34,7 +34,7 @@ MCP -down-> CURSOR
 MCP -down-> VSCODE
 MCP -down-> DROID
 
-rectangle "Claude(注册表)\nclaude mcp add/remove\n(~/.claude.json 项目作用域)" as CLAUDE_REG
+rectangle "Claude(注册表)\nregister sync (internal)\n(~/.claude.json 项目作用域)" as CLAUDE_REG
 SYNC -right-> CLAUDE_REG : 兜底注册
 
 cloud "运行时（stdio）" as RUNTIME
@@ -75,11 +75,7 @@ note bottom of CDT
 end note
 
 note right of CLAUDE_REG
-  环境变量必须位于：
-  name 之后、-- 之前
-  例如：
-  claude mcp add --transport stdio name \
-    -e KEY=VAL -- command args
+  注册表同步由工具自动完成，一般无需手动执行 add/remove
 end note
 
 @enduml

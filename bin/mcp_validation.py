@@ -108,6 +108,13 @@ def validate_mcp_servers_config(config_path: Union[str, Path]) -> Dict[str, Any]
     else:
         print("ℹ️  信息: jsonschema 库未安装，跳过 schema 验证", file=sys.stderr)
     
+    # 无论是否安装 jsonschema，均执行基础内容校验，确保在缺少 schema 库时也能拦截明显错误
+    try:
+        config_data = validate_central_config_format(config_data)
+    except MCPValidationError as e:
+        # 统一异常类型
+        raise MCPConfigError(str(e))
+    
     return config_data
 
 

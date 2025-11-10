@@ -1,6 +1,6 @@
 flowchart TD
   CENTRAL["~/.mcp-central/config/mcp-servers.json"] --> SYNC["mcp-auto-sync.py<br/>(~/.mcp-central/bin)"]
-  CENTRAL --> MCP["mcp<br/>per-client apply<br/>status/pick/run"]
+  CENTRAL --> MCP["mcp<br/>interactive apply<br/>status/check/central"]
 
   subgraph Targets
     CODEX["Codex<br/>~/.codex/config.toml<br/>[mcp_servers.*]"]
@@ -27,7 +27,7 @@ flowchart TD
   MCP --> VSCODE
   MCP --> DROID
 
-  CLAUDE_REG["Claude(register)<br/>claude mcp add/remove<br/>(~/.claude.json project scope)"]
+  CLAUDE_REG["Claude(register)<br/>register sync (internal)<br/>(~/.claude.json project scope)"]
   SYNC -. fallback .-> CLAUDE_REG
 
   RUNTIME[Runtime stdio]

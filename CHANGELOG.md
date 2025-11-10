@@ -26,7 +26,7 @@
   - `README.md` 更新快速使用与目录说明，强调按需落地与最小化启用；`onboard-cursor-minimal.sh` 标注为“可选”。
   - `docs/QUICKSTART-mac.md` 移除“执行同步”表述，明确安装脚本不落地。
   - `docs/troubleshooting-mcp.md` 说明“默认不自动同步”，保留 `mcp-sync.sh` 作为可选路径。
- - CLI：`mcp` 新增 `-n/--dry-run` 预览模式，支持 `run` 等子命令仅显示将进行的写入、注册与启动动作，不做实际修改。
+- CLI 交互化：配置/管理能力改为交互模式；`-n/--dry-run` 已移除，预览与确认在交互步骤中完成。
  - 新增别名：已移除（统一使用 `mcp`）。
 
 ## v1.2.1 (2025-11-04)
@@ -45,8 +45,7 @@
    - 安装脚本会完成：同步→（可选）npx 预热→体检+连通性探测。
 3) 精准落地（按需）：
    - 仅对需要的客户端下发所需 MCP，例如：
-     - `mcp run --client cursor --servers task-master-ai,context7`
-     - `mcp run --client claude --servers filesystem,playwright`
+     - 运行 `mcp run` 进入交互选择所需 MCP 并落地到目标客户端
 4) 验证：
    - `mcp check --probe`（或 `claude/gemini mcp list`）。
 5) 如遇 `task-master-ai@latest` 在 Gemini 侧不稳：
