@@ -33,7 +33,7 @@
 bash scripts/npx-prewarm.sh
 
 # 一次看清配置+连通性
-mcp check --probe
+mcp check
 ```
 
 ## 子命令
@@ -69,6 +69,7 @@ mcp check --probe
   - VS Code：CLI 会按平台自动定位（macOS 使用 `~/Library/Application Support/...`，Linux 使用 `~/.config/...`）
   - Cursor：~/.cursor/mcp.json
 - 文件备份：所有改写会生成带时间戳的 .backup 便于回滚。
+- 体检：`mcp check` 为轻量只读体检；如需连通性等深度体检，请运行 `scripts/mcp-check.sh`。
 - 中央清单建议：Node 生态服务显式写 `npx -y <package>@latest`，保持最新；如需稳定，可对单个服务改为固定版本（`@x.y.z`）。
 - 成本建议：为降低 Token 消耗，建议 CLI（codex/claude/gemini/iflow/droid）按需落地甚至默认不落地；IDE 仅启用必要 MCP（如 `task-master-ai`、`context7`）。
 

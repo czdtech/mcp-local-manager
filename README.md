@@ -109,7 +109,7 @@ bash scripts/install-mac.sh
 脚本会自动：
 - 生成/更新统一清单（不对各客户端落地）
 - 可选预热 npx 缓存（减少首次拉包失败）
-- 运行体检并附带连通性探测（\`--probe\`）：调用 \`claude mcp list\`、\`gemini mcp list\` 等一并输出
+- 运行轻量体检（检查关键路径与配置文件存在性）；如需深度体检（连通性探测等），请执行 `scripts/mcp-check.sh`
 
 ### 统一清单位置
 
@@ -175,10 +175,10 @@ mcp run --client vscode-user --servers filesystem -- code .
 只读健康检查：
 
 ```bash
-mcp check [--probe]
+mcp check
 ```
 
-- \`--probe\` 启用连通性探测，调用各 CLI 的 \`mcp list\` 命令
+说明：`mcp check` 为轻量只读体检；深度体检请运行 `scripts/mcp-check.sh`。
 
 ### clear
 
