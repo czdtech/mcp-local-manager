@@ -295,8 +295,8 @@ claude mcp remove <name> -s user
 # 执行 npx 预热
 bash scripts/npx-prewarm.sh
 
-# 运行体检+连通性探测
-mcp check --probe
+# 运行轻量体检（如需深度体检请执行 scripts/mcp-check.sh）
+mcp check
 
 # 若仅某一端/某一服务连不上：只切换该服务为全局二进制
 ```
