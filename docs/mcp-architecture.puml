@@ -7,7 +7,7 @@ rectangle "mcp-auto-sync.py\n(~/.mcp-central/bin)" as SYNC
 
 CENTRAL -down-> SYNC : 单一来源
 CENTRAL -right-> MCP : 按客户端落地
-rectangle "mcp\nstatus/apply-cli/run/ide-all" as MCP
+rectangle "mcp\nstatus/pick/run" as MCP
 
 package "目标配置 (仅写 MCP 段)" {
   rectangle "Codex\n~/.codex/config.toml\n[mcp_servers.*]" as CODEX

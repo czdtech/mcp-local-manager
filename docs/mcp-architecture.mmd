@@ -1,6 +1,6 @@
 flowchart TD
   CENTRAL["~/.mcp-central/config/mcp-servers.json"] --> SYNC["mcp-auto-sync.py<br/>(~/.mcp-central/bin)"]
-  CENTRAL --> MCP["mcp<br/>per-client apply<br/>status/apply-cli/run/ide-all"]
+  CENTRAL --> MCP["mcp<br/>per-client apply<br/>status/pick/run"]
 
   subgraph Targets
     CODEX["Codex<br/>~/.codex/config.toml<br/>[mcp_servers.*]"]

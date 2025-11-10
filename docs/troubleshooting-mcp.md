@@ -13,9 +13,9 @@
   - 首次安装（macOS/Linux）：`bash scripts/install-mac.sh`（不落地 MCP，仅渲染统一清单与体检）
   - 推荐日常：使用 `mcp` 按需落地而非全量同步：
     - 查看某客户端集合：`mcp status codex` / `mcp status claude`
-    - 仅对某个 CLI 下发：`mcp apply-cli --client claude --servers context7,serena`
+    - 仅对某个 CLI 下发：`mcp run --client claude --servers context7,serena`
     - 下发后直接启动：`mcp run --client claude --servers context7,serena -- claude`
-    - IDE 全量写入（VS Code/Cursor）：`mcp ide-all`
+    - 为 VS Code/Cursor 按需落地：`mcp run --client cursor --servers task-master-ai,context7` / `mcp run --client vscode-user --servers filesystem`
   - 可选脚本路径：`bash scripts/mcp-sync.sh` → `bash scripts/mcp-check.sh`（仅当你需要一次性全量落地时使用）
   - 每次落地前，脚本会生成时间戳备份（`*.YYYYMMDD_HHMMSS.backup`）。
 - 体检脚本改进点（已内置在本仓库）
@@ -58,7 +58,7 @@
   - Claude：
     - `claude mcp add --transport stdio chrome-devtools -e CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX=1 -e CHROME_DEVTOOLS_MCP_EXTRA_ARGS='--disable-dev-shm-usage --disable-gpu' -- npx -y chrome-devtools-mcp@latest`
   - Droid：
-    - `droid mcp add --type stdio chrome-devtools -- npx -y chrome-devtools-mcp@latest`
+    - `droid mcp add chrome-devtools "npx -y chrome-devtools-mcp@latest"`
 
 ---
 
@@ -73,15 +73,14 @@
   - `claude mcp add --transport stdio <name> -e KEY=VAL ... -- <command> <args>`
 
 ### 2) Droid（factory.ai CLI）
-- 交互式 `/mcp` 读取的是“注册表”，仅有 `~/.factory/mcp.json` 或项目级 `.factory/mcp.json` 不足以在会话内显示。
-- 注册写法（务必使用 `--` 分隔）：
-  - `droid mcp add --type stdio <name> -- <command> <args>`
+- 配置文件（官方）：`~/.factory/mcp.json` 顶层 `mcpServers`，项内 `command`、可选 `args`、`env`，常见 `type: stdio`。
+- 交互式 `/mcp` 与 `droid mcp add/remove` 操作同一注册表；通常文件更新会热加载，若未生效可重启会话。
+- 本项目行为：`mcp run --client droid --servers ...` 将“先 remove 再 add”强制对齐注册表，并同步写入 `mcpServers`，与中央清单保持一致。
+- 注册写法（CLI）：
+  - `droid mcp add <name> "<command and args>" [--env KEY=VAL ...]`
   - 例如（npx 最新版）：
-    - `droid mcp add --type stdio playwright -- npx -y @playwright/mcp@latest --headless --no-sandbox --browser chrome --output-dir ~/.mcp-central/logs/playwright`
+    - `droid mcp add playwright "npx -y @playwright/mcp@latest --headless --no-sandbox --browser chrome --output-dir ~/.mcp-central/logs/playwright"`
   - 可选环境（若 droid 找不到 npx 再考虑添加）：`--env PATH="/opt/node/bin:/usr/local/bin:/usr/bin:/bin"`
-- 配置文件（兜底来源）
-  - 全局：`~/.factory/mcp.json`
-  - 项目级：`.factory/mcp.json`
 
 ### 3) VS Code / Cursor
 - VS Code：
@@ -135,7 +134,7 @@ npx -y @playwright/mcp@latest \
 
 提示（dry-run 预览变更）：
 - 在 `mcp` 任意子命令追加 `-n/--dry-run` 可只预览将发生的写入/注册/启动动作，不做任何修改。
-- 示例：`mcp apply-cli -n --client claude --servers context7,serena`、`mcp ide-all --dry-run`、`mcp run -n --client claude --servers context7,serena -- claude`。
+- 示例：`mcp run -n --client claude --servers context7,serena`、`mcp run -n --client claude --servers context7,serena -- claude`。
 
 ---
 
@@ -172,21 +171,17 @@ claude mcp add --transport stdio codex-cli -- npx -y @cexll/codex-mcp-server
 claude mcp remove codex-cli -s local  # 作用域示例
 ```
 
-- Droid（注册，必须用 `--` 分隔）
+- Droid（注册）
 ```bash
-# DevTools 本地二进制
-droid mcp add --type stdio chrome-devtools -- \
-  chrome-devtools-mcp
+# DevTools（npx 最新版）
+droid mcp add chrome-devtools "npx -y chrome-devtools-mcp@latest"
 
 # 可选：传环境参数（与中央清单保持一致）
 # --env CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX=1 \
 # --env CHROME_DEVTOOLS_MCP_EXTRA_ARGS='--disable-dev-shm-usage --disable-gpu'
 
 # Playwright（npx 最新版）
-droid mcp add --type stdio playwright -- \
-  npx -y @playwright/mcp@latest \
-  --headless --no-sandbox --browser chrome \
-  --output-dir ~/.mcp-central/logs/playwright
+droid mcp add playwright "npx -y @playwright/mcp@latest --headless --no-sandbox --browser chrome --output-dir ~/.mcp-central/logs/playwright"
 ```
 
 - VS Code / Cursor / Kilo 文件位置

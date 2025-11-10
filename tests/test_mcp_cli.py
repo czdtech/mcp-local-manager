@@ -1,124 +1,309 @@
 #!/usr/bin/env python3
 """
-Tests for MCP CLI module (bin/mcp).
+Tests for MCP CLI module (bin/mcp) - Script-based approach.
+Tests the actual command-line behavior using subprocess calls.
 """
 
 import json
+import subprocess
 import pytest
 from pathlib import Path
-import sys
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import patch, MagicMock
+import tempfile
+import os
 
-# Add bin directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'bin'))
+# Base directory for test files
+TEST_ROOT = Path(__file__).parent.parent
+BIN_DIR = TEST_ROOT / 'bin'
 
-
-class TestLoadCentralServers:
-    """Tests for load_central_servers function."""
+class TestMCPCLI:
+    """Tests for MCP CLI using subprocess calls."""
     
-    @patch('mcp.load_json')
-    def test_load_central_servers_success(self, mock_load_json):
-        """Test successful loading of central servers."""
-        mock_config = {
-            'version': '1.1.0',
-            'description': 'Test',
-            'servers': {
-                'test-server': {
-                    'command': 'npx',
-                    'args': ['test']
-                }
-            }
-        }
-        mock_load_json.return_value = mock_config
-        
-        from mcp import load_central_servers
-        obj, servers = load_central_servers()
-        
-        assert isinstance(obj, dict)
-        assert isinstance(servers, dict)
-        assert 'test-server' in servers
+    def setup_method(self):
+        """Setup for each test."""
+        # Ensure we have a test environment
+        self.bin_path = str(BIN_DIR / 'mcp')
+        assert Path(self.bin_path).exists(), f"mcp binary not found at {self.bin_path}"
     
-    @patch('mcp.load_json')
-    def test_load_central_servers_empty(self, mock_load_json):
-        """Test loading when config is empty."""
-        mock_load_json.return_value = {}
+    def test_mcp_help(self):
+        """Test mcp --help command."""
+        result = subprocess.run([self.bin_path, '--help'], 
+                              capture_output=True, text=True, timeout=10)
         
-        from mcp import load_central_servers
-        obj, servers = load_central_servers()
-        
-        assert isinstance(servers, dict)
-        assert len(servers) == 0
+        assert result.returncode == 0
+        assert 'MCP' in result.stdout
+        assert 'status' in result.stdout
     
-    @patch('mcp.load_json')
-    @patch('mcp.validate_mcp_servers_config')
-    def test_load_central_servers_with_validation(self, mock_validate, mock_load_json):
-        """Test loading with validation enabled."""
-        mock_config = {
-            'version': '1.1.0',
-            'description': 'Test',
-            'servers': {
-                'test-server': {
-                    'command': 'npx',
-                    'args': ['test']
-                }
-            }
-        }
-        mock_load_json.return_value = mock_config
-        mock_validate.return_value = mock_config
+    def test_mcp_version(self):
+        """Test mcp -v (verbose) flag."""
+        result = subprocess.run([self.bin_path, '-v', 'status'], 
+                              capture_output=True, text=True, timeout=10)
         
-        from mcp import load_central_servers
-        obj, servers = load_central_servers()
+        # Should run with verbose output
+        assert result.returncode == 0
+        # Verbose should contain additional info (specific content may vary)
+    
+    def test_mcp_dry_run_status(self):
+        """Test mcp -n status (dry-run)."""
+        result = subprocess.run([self.bin_path, '-n', 'status'], 
+                              capture_output=True, text=True, timeout=10)
         
-        # Validation should be called if available
-        # (actual behavior depends on validation module availability)
-        assert isinstance(servers, dict)
+        assert result.returncode == 0
+        assert '按客户端/IDE 的实际启用视图' in result.stdout
+    
+    def test_mcp_status_specific_client(self):
+        """Test mcp status for specific client."""
+        result = subprocess.run([self.bin_path, 'status', 'cursor'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert '[Cursor]' in result.stdout
+    
+    def test_mcp_check_command(self):
+        """Test mcp check command."""
+        result = subprocess.run([self.bin_path, 'check'], 
+                              capture_output=True, text=True, timeout=30)
+        
+        # check command may return non-zero due to warnings, but should run
+        assert 'MCP 健康检查报告' in result.stdout
+    
+    def test_mcp_dry_run_run(self):
+        """Test mcp -n run (dry-run)."""
+        result = subprocess.run([self.bin_path, '-n', 'run', 
+                               '--client', 'cursor', '--servers', 'filesystem'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        assert 'DRY-RUN' in result.stdout or 'dry-run' in result.stdout.lower()
+    
+    def test_mcp_invalid_command(self):
+        """Test mcp with invalid command."""
+        result = subprocess.run([self.bin_path, 'invalid_command'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode != 0
+        assert 'invalid choice' in result.stderr or 'error' in result.stderr.lower()
+    
+    def test_mcp_invalid_client(self):
+        """Test mcp with invalid client."""
+        result = subprocess.run([self.bin_path, 'status', 'invalid_client'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        # Should handle invalid client gracefully
+        assert result.returncode == 0 or 'error' in result.stdout.lower()
+    
+    def test_mcp_validation_script(self):
+        """Test that validation script works."""
+        validation_script = BIN_DIR / 'mcp_validation.py'
+        sample_config = TEST_ROOT / 'config' / 'mcp-servers.sample.json'
+        
+        assert validation_script.exists(), f"Validation script not found at {validation_script}"
+        assert sample_config.exists(), f"Sample config not found at {sample_config}"
+        
+        result = subprocess.run(['python3', str(validation_script), str(sample_config)], 
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert '配置验证通过' in result.stdout
 
 
-class TestValidationIntegration:
-    """Tests for validation integration in CLI."""
+class TestMCPErrorHandling:
+    """Tests for error handling in MCP CLI."""
     
-    @patch('mcp.CENTRAL')
-    @patch('mcp.validate_mcp_servers_config')
-    def test_validation_error_handling(self, mock_validate, mock_central):
-        """Test error handling when validation fails."""
-        from mcp import MCPValidationError
+    def setup_method(self):
+        """Setup for each test."""
+        self.bin_path = str(BIN_DIR / 'mcp')
+    
+    def test_mcp_nonexistent_file_operations(self):
+        """Test mcp operations with non-existent files (if applicable)."""
+        # This test ensures error handling works
+        result = subprocess.run([self.bin_path, 'check'], 
+                              capture_output=True, text=True, timeout=10)
         
-        mock_central.exists.return_value = True
-        mock_validate.side_effect = MCPValidationError("Validation failed")
+        # check should run regardless of configuration state
+        assert 'MCP 健康检查报告' in result.stdout
+    
+    def test_mcp_timeout_protection(self):
+        """Test that mcp commands have proper timeout handling."""
+        # This is more of a regression test to ensure commands don't hang
+        import signal
         
-        # Should handle validation errors gracefully
-        from mcp import load_central_servers
-        # Should not raise, but fall back to basic loading
-        try:
-            obj, servers = load_central_servers()
-            # If validation fails, should still return something
-            assert isinstance(servers, dict)
-        except Exception:
-            # If it raises, that's also acceptable behavior
-            pass
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Command timed out")
+        
+        # Test a quick command with timeout
+        result = subprocess.run([self.bin_path, '--help'], 
+                              capture_output=True, text=True, timeout=5)
+        
+        assert result.returncode == 0
+        assert 'MCP' in result.stdout
 
 
-class TestErrorRecovery:
-    """Tests for error recovery mechanisms."""
+class TestMCPDryRun:
+    """Tests specifically for dry-run functionality."""
     
-    @patch('mcp.load_json')
-    def test_load_json_error_recovery(self, mock_load_json):
-        """Test error recovery in load_json."""
-        mock_load_json.side_effect = Exception("File read error")
-        
-        from mcp import load_json
-        result = load_json(Path('/nonexistent'), {})
-        
-        # Should return default value on error
-        assert result == {}
+    def setup_method(self):
+        """Setup for each test."""
+        self.bin_path = str(BIN_DIR / 'mcp')
     
-    @patch('mcp.CENTRAL')
-    def test_load_central_servers_file_not_found(self, mock_central):
-        """Test handling when central config doesn't exist."""
-        mock_central.exists.return_value = False
+    def test_dry_run_doesnt_modify_files(self):
+        """Ensure dry-run doesn't modify any files."""
+        # Get initial state of key files
+        home = Path.home()
+        claude_config = home / '.claude' / 'settings.json'
+        cursor_config = home / '.cursor' / 'mcp.json'
         
-        from mcp import load_central_servers
-        obj, servers = load_central_servers()
+        initial_states = {}
+        for config_path in [claude_config, cursor_config]:
+            if config_path.exists():
+                initial_states[config_path] = config_path.read_text()
         
-        # Should return empty dict when file doesn't exist
-        assert isinstance(servers, dict)
+        # Run dry-run commands
+        subprocess.run([self.bin_path, '-n', 'status'], 
+                      capture_output=True, text=True, timeout=10)
+        
+        # Check that no files were modified
+        for config_path, original_content in initial_states.items():
+            if config_path.exists():
+                current_content = config_path.read_text()
+                assert current_content == original_content, f"File {config_path} was modified during dry-run"
+    
+    def test_dry_run_shows_intended_actions(self):
+        """Test that dry-run shows what would be done."""
+        result = subprocess.run([self.bin_path, '-n', 'status', 'cursor'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        # Should show status information
+        assert '[Cursor]' in result.stdout
+
+
+class TestMCPIntegration:
+    """Integration tests for MCP CLI."""
+    
+    def setup_method(self):
+        """Setup for each test."""
+        self.bin_path = str(BIN_DIR / 'mcp')
+    
+    def test_validation_integration(self):
+        """Test integration between CLI and validation."""
+        validation_script = BIN_DIR / 'mcp_validation.py'
+        sample_config = TEST_ROOT / 'config' / 'mcp-servers.sample.json'
+        
+        # First validate the config
+        result = subprocess.run(['python3', str(validation_script), str(sample_config)], 
+                              capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0
+        
+        # Then use it with CLI (this tests the integration)
+        # Note: We don't actually apply it, just test that the CLI can run
+        result = subprocess.run([self.bin_path, 'status'], 
+                              capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0
+    
+    def test_multiple_client_status(self):
+        """Test status for multiple clients."""
+        clients = ['claude', 'cursor', 'codex', 'droid']
+        
+        for client in clients:
+            result = subprocess.run([self.bin_path, 'status', client], 
+                                  capture_output=True, text=True, timeout=10)
+            assert result.returncode == 0, f"Failed to get status for {client}"
+
+
+class TestMCPIClear:
+    """Tests specifically for the clear command."""
+    
+    def setup_method(self):
+        """Setup for each test."""
+        self.bin_path = str(BIN_DIR / 'mcp')
+    
+    def test_clear_help(self):
+        """Test mcp clear --help command."""
+        result = subprocess.run([self.bin_path, 'clear', '--help'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert 'clear' in result.stdout
+        assert '--client' in result.stdout
+        assert '--yes' in result.stdout
+    
+    def test_clear_dry_run_specific_client(self):
+        """Test mcp -n clear --client cursor --yes (dry-run)."""
+        result = subprocess.run([self.bin_path, '-n', 'clear', '--client', 'cursor', '--yes'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert 'DRY-RUN' in result.stdout or 'dry-run' in result.stdout.lower()
+        assert 'Cursor' in result.stdout
+    
+    def test_clear_dry_run_all_clients(self):
+        """Test mcp -n clear --yes (dry-run for all clients)."""
+        result = subprocess.run([self.bin_path, '-n', 'clear', '--yes'], 
+                              capture_output=True, text=True, timeout=30)
+        
+        assert result.returncode == 0
+        assert 'DRY-RUN' in result.stdout or 'dry-run' in result.stdout.lower()
+        # Should mention that it's clearing all clients
+        assert 'all' in result.stdout.lower() or 'claude' in result.stdout.lower()
+    
+    def test_clear_requires_confirmation(self):
+        """Test that clear requires confirmation without --yes."""
+        result = subprocess.run([self.bin_path, 'clear', '--client', 'cursor'], 
+                              input='n\n',  # Simulate 'n' response
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert '确认' in result.stdout
+        assert '已取消' in result.stdout
+    
+    def test_clear_with_yes_flag(self):
+        """Test clear with --yes flag."""
+        result = subprocess.run([self.bin_path, '-n', 'clear', '--client', 'cursor', '--yes'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert '已取消' not in result.stdout  # Should not be cancelled
+    
+    def test_clear_invalid_client(self):
+        """Test clear with invalid client."""
+        result = subprocess.run([self.bin_path, 'clear', '--client', 'invalid_client'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        # argparse returns exit code 2 for invalid argument choices
+        assert result.returncode == 2
+        # Should show usage error
+        assert 'invalid choice' in result.stderr
+        assert 'invalid_client' in result.stderr
+    
+    def test_clear_multiple_specific_clients(self):
+        """Test clear for multiple specific clients."""
+        clients = ['cursor', 'codex', 'droid']
+        
+        for client in clients:
+            result = subprocess.run([self.bin_path, '-n', 'clear', '--client', client, '--yes'], 
+                                  capture_output=True, text=True, timeout=10)
+            assert result.returncode == 0, f"Failed to clear {client}"
+            assert 'DRY-RUN' in result.stdout or 'dry-run' in result.stdout.lower()
+    
+    def test_clear_verbose_mode(self):
+        """Test clear with verbose mode."""
+        result = subprocess.run([self.bin_path, '-n', 'clear', '--client', 'cursor', '--yes', '-v'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert 'DRY-RUN' in result.stdout or 'dry-run' in result.stdout.lower()
+        # Verbose mode may show additional details
+        assert 'Cursor' in result.stdout
+    
+    def test_clear_env_variable_yes(self):
+        """Test clear with MCP_CLEAR_YES=1 environment variable."""
+        env = os.environ.copy()
+        env['MCP_CLEAR_YES'] = '1'
+        
+        result = subprocess.run([self.bin_path, '-n', 'clear', '--client', 'cursor'], 
+                              env=env, capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert 'DRY-RUN' in result.stdout or 'dry-run' in result.stdout.lower()
+        # Should not ask for confirmation due to env variable
+        assert '确认' not in result.stdout

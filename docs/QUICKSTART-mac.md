@@ -20,12 +20,12 @@ mcp status cursor
 若需对某 CLI 临时下发少量服务，请使用：
 
 ```
-mcp apply-cli --client <cli> --servers context7,task-master-ai
+mcp run --client <cli> --servers context7,task-master-ai
 ```
 
 仅预览（不写入）：可在任何命令加 `-n/--dry-run`，例如：
 ```
-mcp apply-cli -n --client claude --servers context7,serena
+mcp run -n --client claude --servers context7,serena
 ```
 ```
 cd mcp-local-manager
@@ -44,10 +44,10 @@ bash scripts/install-mac.sh
 mcp run --client claude --servers context7,serena -- claude
 
 # 或者仅下发不启动：
-mcp apply-cli --client claude --servers context7,serena
+mcp run --client claude --servers context7,serena
 
 # IDE（VS Code/Cursor）建议按需启用少量（示例：Cursor 只启用 task-master-ai + context7）：
-mcp apply-cli --client cursor --servers task-master-ai,context7
+mcp run --client cursor --servers task-master-ai,context7
 
 # 查看当前集合：
 mcp status codex   # 或 claude/vscode/cursor

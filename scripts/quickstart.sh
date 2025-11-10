@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 60 秒引导：安装 mcp、准备统一清单、为 IDE 写入全部 MCP
+# 60 秒引导：安装 mcp、准备统一清单（不对 IDE 进行全量写入）
 
 REPO_URL="https://github.com/czdtech/mcp-local-manager.git"
 REPO_DIR="${REPO_DIR:-$PWD/mcp-local-manager}"
@@ -52,20 +52,13 @@ install_mcp() {
   command -v mcp >/dev/null && log "mcp 就绪: $(command -v mcp)" || warn "未找到 mcp"
 }
 
-ide_full() {
-  info "为 IDE 写入全部 MCP（VS Code/Cursor）..."
-  mcp ide-all >/dev/null || warn "mcp ide-all 执行失败，请稍后重试"
-}
-
 main() {
   ensure_repo
   ensure_central
   install_mcp
-  ide_full
   log "完成。下一步建议："
   printf "\n- 仅对 Claude 下发并启动：\n  mcp run --client claude --servers context7,serena -- claude\n"
   printf "- 查看某个客户端集合：\n  mcp status codex  # 或 claude / vscode / cursor\n\n"
 }
 
 main "$@"
-
