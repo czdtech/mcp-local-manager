@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.2 (2025-11-10)
+
+- 文档/脚本同步与测试补充（补丁发布，不含 CLI 功能变更）：
+  - docs: QUICKSTART / troubleshooting / 架构图 等微调
+  - scripts: install / onboard / quickstart 提示同步
+  - tests: 新增 tests/test_sync_integration.py；修正与整理测试套件
+
 ## v1.3.0 (2025-11-06)
 
 - 重大变更：命令行工具统一为 `mcp`，旧命令别名已移除。
