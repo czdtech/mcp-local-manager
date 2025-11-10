@@ -20,7 +20,7 @@ bash scripts/mcp-check.sh     # 只读健康检查
 
 ```bash
 # 将所选 MCP 仅应用到某个 CLI/IDE：
-mcp apply-cli --client claude --servers context7,serena
+mcp run --client claude --servers context7,serena
 
 # 交互选择并应用：
 mcp pick
@@ -31,8 +31,9 @@ mcp run --client claude --servers context7,serena -- claude
 # 查看单个客户端当前集合：
 mcp status codex   # 等价于：mcp status --client codex
 
-# IDE（VS Code/Cursor）统一写入全部，具体开关在 IDE 内操作：
-mcp ide-all
+# 为 VS Code/Cursor 按需落地（示例）：
+mcp run --client cursor --servers task-master-ai,context7
+mcp run --client vscode-user --servers filesystem
 ```
 
 ### 预览模式（dry-run）
@@ -41,10 +42,9 @@ mcp ide-all
 
 ```bash
 # 仅预览将写入 Claude 文件与注册表的变更
-mcp apply-cli -n --client claude --servers context7,serena
+mcp -n run --client claude --servers context7,serena
 
-# 仅预览将写入 VS Code/Cursor 的全集（不落地）
-mcp ide-all --dry-run
+# 仅预览将写入某个客户端（不落地）
 
 # 仅预览按客户端应用后将要启动的命令
 mcp run -n --client claude --servers context7,serena -- claude
@@ -122,11 +122,10 @@ bash scripts/install-mac.sh
 - **Gemini**: \`~/.gemini/settings.json\` - 仅 \`mcpServers\` + \`mcp.allowed\`
 - **iFlow**: \`~/.iflow/settings.json\` - 仅 \`mcpServers\`
 - **Claude**: \`~/.claude/settings.json\` - 写 \`mcpServers\`；若缺项则命令兜底补齐
-- **Droid**: \`~/.factory/mcp.json\` - 仅 \`mcpServers\`
+- **Droid**: \`~/.factory/mcp.json\` - 仅 \`mcpServers\`；`mcp run --client droid` 将对所选集合执行“remove → add”强制对齐注册表。
 - **Cursor**: \`~/.cursor/mcp.json\` - 仅 \`mcpServers\`
-- **VS Code**: 
-  - macOS: \`~/Library/Application Support/Code/User/mcp.json\` 顶层 \`servers\`
-  - macOS Insiders: \`~/Library/Application Support/Code - Insiders/User/mcp.json\`
+- **VS Code**: CLI 会按平台自动选择路径：
+  - macOS: \`~/Library/Application Support/Code/User/mcp.json\` 与 \`~/Library/Application Support/Code - Insiders/User/mcp.json\`
   - Linux: \`~/.config/Code/User/mcp.json\` 与 \`~/.config/Code - Insiders/User/mcp.json\`
 
 ## CLI 命令参考
@@ -149,36 +148,12 @@ mcp status claude
 mcp status cursor
 ```
 
-### apply-cli
-
-将一组 MCP 仅应用到某个 CLI/IDE 的配置文件：
-
-```bash
-mcp apply-cli --client <client> --servers <name1,name2,...>
-```
-
-- \`client\` 取值：\`claude\` | \`codex\` | \`gemini\` | \`iflow\` | \`droid\` | \`cursor\` | \`vscode-user\` | \`vscode-insiders\`
-
-示例：
-```bash
-mcp apply-cli --client claude --servers context7,serena
-mcp apply-cli --client cursor --servers task-master-ai,context7
-```
-
 ### pick
 
 交互式选择目标 CLI/IDE 与 MCP 集合并应用：
 
 ```bash
 mcp pick
-```
-
-### ide-all
-
-将"全部 MCP"写入 VS Code（User/Insiders）与 Cursor；开关在 IDE 界面内操作：
-
-```bash
-mcp ide-all
 ```
 
 ### run
@@ -204,6 +179,22 @@ mcp check [--probe]
 ```
 
 - \`--probe\` 启用连通性探测，调用各 CLI 的 \`mcp list\` 命令
+
+### clear
+
+一键清除所有 CLI/IDE 的 MCP 配置（支持定向某个客户端）：
+
+```bash
+# 清空全部客户端的 MCP 配置（包含 Claude 注册表）
+mcp clear -y
+
+# 仅清空某个客户端
+mcp clear --client codex -y
+```
+
+说明：
+- 会对相关配置文件做时间戳备份；`-n/--dry-run` 仅预览将清理的目标。
+- 覆盖范围：Claude(文件+注册表)、Codex、Gemini、iFlow、Droid、Cursor、VS Code(User/Insiders)。
 
 ## 配置验证
 
@@ -316,8 +307,7 @@ mcp check --probe
 
 1. 先运行 \`scripts/mcp-check.sh\` 只读体检，记录现状
 2. 准备/确认 \`~/.mcp-central/config/mcp-servers.json\`（统一清单，未显式 false 的都视为启用）
-3. IDE 侧执行 \`mcp ide-all\`（把全部 MCP 写入 IDE，后续开关在 IDE 内操作）
-4. 启动某个 CLI 前，用 \`mcp apply-cli\` 或 \`mcp run\` 精确下发所需 MCP
+4. 启动某个 CLI 前，用 `mcp run` 精确下发所需 MCP
 5. 如需全量改写各目标，也可用 \`scripts/mcp-sync.sh\`
 
 **注意事项**：

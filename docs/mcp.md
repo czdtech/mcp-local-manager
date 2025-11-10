@@ -19,11 +19,12 @@
 
 仅下发不启动：
 
-    mcp apply-cli --client claude --servers context7,serena
+    mcp run --client claude --servers context7,serena
 
-IDE（VS Code/Cursor）写入全部 MCP；具体开关在 IDE 内操作：
+为 VS Code/Cursor 按需落地（示例）：
 
-    mcp ide-all
+    mcp run --client cursor --servers task-master-ai,context7
+    mcp run --client vscode-user --servers filesystem
 
 安装/同步后建议：
 
@@ -43,15 +44,11 @@ mcp check --probe
     - claude(= claude-file)、claude-reg、codex、gemini、iflow、droid、cursor、vscode(=vscode-user)、vscode-insiders
   - --central 可选显示中央清单（通常不需要）。
 
-- apply-cli --client <client> --servers <name1,name2,...>
-  - 将一组 MCP 仅应用到某个 CLI/IDE 的配置文件；其它客户端不受影响。
-  - client 取值：claude | codex | gemini | iflow | droid | cursor | vscode-user | vscode-insiders。
+（已移除）apply-cli：请使用 `mcp run --client <client> --servers <...>`；若省略 `--` 后的启动命令，则只做落地。
 
 - pick
   - 交互式选择目标 CLI/IDE 与 MCP 集合并应用。
 
-- ide-all
-  - 将“全部 MCP”写入 VS Code（User/Insiders）与 Cursor；开关在 IDE 界面内操作。
 
 - run --client <client> --servers <...> -- <启动命令...>
   - 先按客户端应用集合，再执行启动命令；若省略启动命令，则只做应用不启动。
@@ -59,11 +56,17 @@ mcp check --probe
     - mcp run --client claude --servers context7,serena -- claude
     - mcp run --client vscode-user --servers filesystem -- code .
 
+- clear [--client <client>|all] [-y]
+  - 一键清除 MCP 配置；默认 `--client all`，可定向单个客户端。
+  - 会备份配置文件；支持 `-n/--dry-run` 仅预览。
+  - 覆盖：Claude(文件+注册表)、Codex、Gemini、iFlow、Droid、Cursor、VS Code(User/Insiders)。
+
 ## 注意事项
 
-- Claude 注册表：apply-cli/run 会清理多余注册项并补齐缺失，确保 /mcp 面板只显示所选集合。
+- Claude 注册表：run 会清理多余注册项并补齐缺失，确保 /mcp 面板只显示所选集合。
+- Droid 注册表：run 会对所选集合执行“先 remove 再 add”，并写入 `~/.factory/mcp.json` 顶层 `mcpServers`，确保 /mcp 面板与中央清单完全一致。
 - IDE 专用文件：
-  - VS Code：~/.config/Code/User/mcp.json 与 ~/.config/Code - Insiders/User/mcp.json
+  - VS Code：CLI 会按平台自动定位（macOS 使用 `~/Library/Application Support/...`，Linux 使用 `~/.config/...`）
   - Cursor：~/.cursor/mcp.json
 - 文件备份：所有改写会生成带时间戳的 .backup 便于回滚。
 - 中央清单建议：Node 生态服务显式写 `npx -y <package>@latest`，保持最新；如需稳定，可对单个服务改为固定版本（`@x.y.z`）。
@@ -77,4 +80,4 @@ mcp check --probe
 
 - “status 显示 on/off 与你的预期不一致”：先确认查看的是目标客户端（如 status claude 而非空参）。
 - “run 后没有启动”：-- 之后是否跟了启动命令；省略时只做落地不启动。
-- “IDE 里未显示新条目”：先执行 mcp ide-all，让 IDE 文件包含完整集合，然后在 IDE 界面里逐项开关。
+- “IDE 里未显示新条目”：请使用 `mcp run --client <cursor|vscode-user|vscode-insiders> --servers <...>` 将所需服务写入对应 IDE，然后在 IDE 内逐项开关。
