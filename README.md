@@ -181,6 +181,8 @@ pytest -v
 pytest tests/test_validation.py -v
 ```
 
+注意：本项目不启用任何线上 CI（如 GitHub Actions）。默认策略是“本地验证通过即可直接推送”。如需团队内约定的额外校验，请在本地脚本中完成，而不是依赖远端流水线。
+
 ## 故障排查
 
 ### 常见问题
