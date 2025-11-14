@@ -172,45 +172,84 @@ def apply_claude(subset: dict, verbose: bool=False, dry_run: bool=False) -> int:
 
 
 def run(args) -> int:
-    # 全交互式：引导选择客户端与服务器集合
-    dry_run = False
-    # 选择客户端
-    clients = [('claude','Claude'),('codex','Codex'),('gemini','Gemini'),('iflow','iFlow'),('droid','Droid'),('cursor','Cursor'),('vscode-user','VS Code(User)'),('vscode-insiders','VS Code(Insiders)')]
-    if os.environ.get('MCP_DEBUG'):
-        print('[DBG] enter run', file=os.sys.stderr)
-    print('选择目标 CLI/IDE:')
-    for i,(k,label) in enumerate(clients, start=1):
-        print(f'  {i}) {label} [{k}]')
-    try:
-        idx = int(input('输入编号: ').strip() or '1')
-    except Exception:
-        idx = 1
-    client = clients[max(1,min(idx,len(clients)))-1][0]
-    # 选择服务器集合
-    _, servers = U.load_central_servers()
-    names = sorted(servers.keys())
-    if not names:
-        print('[ERR] 中央清单为空');
-        return 1
-    print('\n选择要启用的 MCP（空格分隔编号；留空=第一个）:')
-    for i,n in enumerate(names, start=1):
-        print(f'  {i:2}) {n}')
-    if os.environ.get('MCP_DEBUG'):
-        print('[DBG] before picks', file=os.sys.stderr)
-    picks = input('输入编号列表: ').strip().split()
-    if os.environ.get('MCP_DEBUG'):
-        print('[DBG] got picks', picks, file=os.sys.stderr)
-    chosen = []
-    for p in picks:
-        if p.isdigit() and 1 <= int(p) <= len(names):
-            chosen.append(names[int(p)-1])
-    if not chosen:
-        chosen = [names[0]]
-    subset = {n: servers[n] for n in chosen}
+    """run 子命令主入口。
+
+    支持两种使用方式：
+    1) `mcp run` 交互式：函数内部引导选择 client 与 servers；
+    2) 预选模式：当 args 上已经带有 `client` 与 `servers` 时
+      （例如 `mcp pick` 调用）直接按给定集合落地，避免重复交互。
+    """
+    # 是否 dry-run：兼容未来从外层传入 _dry_run 标记
+    dry_run = bool(getattr(args, '_dry_run', False))
+
+    client = getattr(args, 'client', None)
+    pre_servers = getattr(args, 'servers', None)
+    subset = None
+
+    # 预选模式：pick 等入口会构造 client/servers 参数
+    if client and pre_servers:
+        _, servers = U.load_central_servers()
+        if isinstance(pre_servers, str):
+            names = [s for s in pre_servers.split(',') if s.strip()]
+        elif isinstance(pre_servers, (list, tuple)):
+            names = [str(s) for s in pre_servers if str(s).strip()]
+        else:
+            names = []
+        names = [n for n in names if n in servers]
+        if not names:
+            print('[ERR] 选定的服务器在中央清单中不存在')
+            return 1
+        subset = {n: servers[n] for n in names}
+    else:
+        # 全交互式：引导选择客户端与服务器集合
+        # 选择客户端
+        clients = [
+            ('claude','Claude'),
+            ('codex','Codex'),
+            ('gemini','Gemini'),
+            ('iflow','iFlow'),
+            ('droid','Droid'),
+            ('cursor','Cursor'),
+            ('vscode-user','VS Code(User)'),
+            ('vscode-insiders','VS Code(Insiders)'),
+        ]
+        if os.environ.get('MCP_DEBUG'):
+            print('[DBG] enter run', file=os.sys.stderr)
+        print('选择目标 CLI/IDE:')
+        for i,(k,label) in enumerate(clients, start=1):
+            print(f'  {i}) {label} [{k}]')
+        try:
+            idx = int(input('输入编号: ').strip() or '1')
+        except Exception:
+            idx = 1
+        client = clients[max(1, min(idx, len(clients)))-1][0]
+        # 选择服务器集合
+        _, servers = U.load_central_servers()
+        names = sorted(servers.keys())
+        if not names:
+            print('[ERR] 中央清单为空')
+            return 1
+        print('\n选择要启用的 MCP（空格分隔编号；留空=第一个）:')
+        for i,n in enumerate(names, start=1):
+            print(f'  {i:2}) {n}')
+        if os.environ.get('MCP_DEBUG'):
+            print('[DBG] before picks', file=os.sys.stderr)
+        picks = input('输入编号列表: ').strip().split()
+        if os.environ.get('MCP_DEBUG'):
+            print('[DBG] got picks', picks, file=os.sys.stderr)
+        chosen = []
+        for p in picks:
+            if p.isdigit() and 1 <= int(p) <= len(names):
+                chosen.append(names[int(p)-1])
+        if not chosen:
+            chosen = [names[0]]
+        subset = {n: servers[n] for n in chosen}
+
     if os.environ.get('MCP_DEBUG'):
         print('[DBG] client', client, file=os.sys.stderr)
+
     if client == 'claude':
-        rc = apply_claude(subset, verbose=getattr(args,'verbose',False), dry_run=dry_run)
+        rc = apply_claude(subset, verbose=getattr(args, 'verbose', False), dry_run=dry_run)
     elif client == 'codex':
         rc = apply_codex(subset, dry_run=dry_run)
     elif client == 'gemini':
@@ -220,7 +259,7 @@ def run(args) -> int:
     elif client == 'droid':
         rc = apply_json_map('Droid', U.HOME/'.factory'/'mcp.json', subset, 'mcpServers', dry_run=dry_run)
         # 对齐 Droid 注册表
-        want=set(subset.keys())
+        want = set(subset.keys())
         obj,_ = U.load_central_servers()
         servers = obj.get('servers') or {}
         if dry_run:
@@ -228,7 +267,9 @@ def run(args) -> int:
             print('  keys:', ', '.join(sorted(want)) if want else '(none)')
             for n in sorted(want):
                 info = servers.get(n) or {}
-                cmd_str = ' '.join([_expand_tilde(info.get('command',''))] + [ _expand_tilde(str(a)) for a in (info.get('args') or []) ])
+                cmd_str = ' '.join([
+                    _expand_tilde(info.get('command',''))
+                ] + [_expand_tilde(str(a)) for a in (info.get('args') or [])])
                 print('[DRY-RUN]', ' '.join(['droid','mcp','remove', n]))
                 cmd = ['droid','mcp','add', n, cmd_str]
                 for k,v in (info.get('env') or {}).items():
@@ -241,12 +282,14 @@ def run(args) -> int:
                 except Exception:
                     pass
                 info = servers.get(n) or {}
-                cmd_str = ' '.join([_expand_tilde(info.get('command',''))] + [ _expand_tilde(str(a)) for a in (info.get('args') or []) ])
+                cmd_str = ' '.join([
+                    _expand_tilde(info.get('command',''))
+                ] + [_expand_tilde(str(a)) for a in (info.get('args') or [])])
                 cmd = ['droid','mcp','add', n, cmd_str]
                 for k,v in (info.get('env') or {}).items():
                     cmd += ['--env', f'{k}={v}']
                 try:
-                    if getattr(args,'verbose',False):
+                    if getattr(args, 'verbose', False):
                         print('[VERBOSE]', ' '.join(cmd))
                     subprocess.run(cmd, check=False, timeout=30)
                 except Exception:

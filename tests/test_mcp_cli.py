@@ -263,3 +263,30 @@ class TestMCPIClear:
         assert result.returncode == 0
         # Should not ask for confirmation due to env variable
         assert '确认' not in result.stdout
+
+
+class TestMCPPick:
+    """针对隐藏入口 mcp pick 的回归测试。"""
+
+    def setup_method(self):
+        self.bin_path = str(BIN_DIR / 'mcp')
+
+    def test_pick_basic_flow(self):
+        """选择默认客户端与第一个服务，确认后直接落地并跳过启动。"""
+        # 输入顺序：
+        # 1. 选择客户端: 回车=1 (claude)
+        # 2. 选择服务: 回车=不选 -> 为保证有选择，显式输入第一个编号
+        # 3. 确认: y
+        # 4. run 阶段启动提示: 回车跳过
+        input_str = '1\n1\ny\n\n'
+        result = subprocess.run(
+            [self.bin_path, 'pick'],
+            input=input_str,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        # 根据环境不同，可能因为外部 CLI 缺失返回 0 或 1，这里只要求流程可退出
+        assert result.returncode in (0, 1)
+        # 不应出现重复的第一层菜单提示（说明没有进入二次交互循环）
+        assert result.stdout.count('选择目标 CLI/IDE:') == 1
