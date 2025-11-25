@@ -371,13 +371,14 @@ def cmd_undo(args):
         return 1
     if dest is None:
         name = backup_path.name
+        # 先去掉 .backup 尾缀
         if name.endswith('.backup'):
             name = name[:-7]
-        # 去掉时间戳片段（形如 .20240510_120000）
-        parts = name.split('.')
-        if parts and len(parts[-1]) == 15 and parts[-1][8] == '_':
-            parts = parts[:-1]
-        dest = backup_path.with_name('.'.join(parts) if parts else name)
+        # 兼容旧格式：config.json.20251125_143022.backup / config.20251125_143022.backup
+        import re
+        m = re.match(r"^(?P<base>.+)\.(?P<ts>\d{8}_\d{6})$", name)
+        base = m.group('base') if m else name
+        dest = backup_path.with_name(base)
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(backup_path, dest)
