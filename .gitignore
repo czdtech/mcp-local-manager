@@ -93,3 +93,4 @@ node_modules/
 .mcp.json
 AGENTS.md
 CLAUDE.md
+.taskmaster/
