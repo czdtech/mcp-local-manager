@@ -32,7 +32,11 @@ if [[ ! -f "$CENTRAL" ]]; then
       "enabled":true,
       "type":"local",
       "command":"npx",
-      "args":["-y","task-master-ai@latest"]
+      "args":["-y","task-master-ai@latest"],
+      "timeout":300,
+      "env":{
+        "TASK_MASTER_TOOLS":"standard"
+      }
     }
   }
 }
@@ -47,7 +51,14 @@ p=Path(os.environ['CENTRAL'])
 obj=json.loads(p.read_text(encoding='utf-8')) if p.exists() else {"servers":{}}
 srv=obj.setdefault('servers',{})
 srv.setdefault('context7', {"enabled":True,"type":"local","command":"npx","args":["-y","@upstash/context7-mcp@latest"]})
-srv.setdefault('task-master-ai', {"enabled":True,"type":"local","command":"npx","args":["-y","task-master-ai@latest"]})
+srv.setdefault('task-master-ai', {
+    "enabled":True,
+    "type":"local",
+    "command":"npx",
+    "args":["-y","task-master-ai@latest"],
+    "timeout":300,
+    "env":{"TASK_MASTER_TOOLS":"standard"}
+})
 p.write_text(json.dumps(obj,ensure_ascii=False,indent=2),encoding='utf-8')
 print('[ok] 已确保中央清单包含 context7 与 task-master-ai')
 PY

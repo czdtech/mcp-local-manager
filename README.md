@@ -229,7 +229,32 @@ npm i -g task-master-ai@latest
 "args": []
 ```
 
-#### 2. Claude 注册表清理
+#### 2. task-master-ai MCP 启动超时/握手失败
+
+**症状**：`task-master-ai` 在 Cursor/Gemini 等客户端显示 `⚠ MCP client ... failed to start`、`handshaking with MCP server failed: connection closed: initialize response`，或一直停留在“加载工具/0 tools enabled”。
+
+**根因**：官方默认会一次性加载 36 个工具（约 2.1 万 tokens），且 MCP 默认仅等待 60 秒。一旦 `npx` 首次安装过慢或工具初始化超过 60 秒，客户端就会直接断开握手。
+
+**修复步骤（摘自 Task Master 官方配置文档《Configuration》→“MCP Tool Loading Configuration”与“MCP Timeout Configuration”）：**
+
+1. 在中央清单或客户端配置中为 `task-master-ai` 增加 `"timeout": 300`（单位秒，可按需调到 600），例如：
+   ```jsonc
+   "task-master-ai": {
+     "command": "npx",
+     "args": ["-y", "task-master-ai@latest"],
+     "timeout": 300,
+     "env": {
+       "TASK_MASTER_TOOLS": "standard"
+     }
+   }
+   ```
+2. 视项目体量将 `TASK_MASTER_TOOLS` 设为 `standard`（15 个常用工具，≈10k tokens）或 `core/lean`（7 个核心工具，≈5k tokens），可显著缩短初始化时间。
+3. 通过 `mcp run` 重新对目标客户端落地配置，或在 Cursor MCP 面板关闭/再开启 `task-master-ai`。
+4. 如仍报错，执行 `npx -y task-master-ai@latest --version` 确认最新版是否能本地启动，并排查 API Key 是否至少配置一项。
+
+> 以上 timeout / 工具集开关均由 task-master 官方提供，详见 https://docs.task-master.dev/（若页面返回 404，可参阅仓库 `docs/configuration.md` 同步内容）。本项目提供 `mcp central doctor` 体检命令，会对 `task-master-ai` 条目的 `timeout` 与 `TASK_MASTER_TOOLS` 做专项检查：缺少/过小/设为 `all` 时会标记为 failed 并给出修复建议。
+
+#### 3. Claude 注册表清理
 
 若"文件为主"策略下仍有注册表残留：
 
@@ -238,14 +263,14 @@ claude mcp remove <name> -s local
 claude mcp remove <name> -s user
 ```
 
-#### 3. VS Code/Cursor 不生效
+#### 4. VS Code/Cursor 不生效
 
 - 确保使用专用 MCP 文件：
   - VS Code: \`~/.config/Code/User/mcp.json\`（顶层 \`servers\`）
   - Cursor: \`~/.cursor/mcp.json\`（顶层 \`mcpServers\`）
 - 不要把 MCP 配置放入 \`settings.json\`
 
-#### 4. 一键失败排查
+#### 5. 一键失败排查
 
 ```bash
 # 执行 npx 预热

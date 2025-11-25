@@ -71,6 +71,7 @@ mcp check
 
 补充（task-master-ai 与 @latest）：
 - Cursor 端推荐最小配置：`"command":"npx","args":["-y","task-master-ai@latest"]`，在 `env` 中至少提供一个可用 Provider 的 API Key（如 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`）。
+- 若出现“握手失败/0 tools enabled”，请参考 Task Master 官方配置文档的 *MCP Tool Loading Configuration* 与 *MCP Timeout Configuration*：在条目内加入 `"timeout": 300`（秒）并设置 `"TASK_MASTER_TOOLS": "standard"` 或 `"core"`，即可显著缩短加载并避免 60 秒超时。也可以运行 `mcp central doctor`，该命令会对 `task-master-ai` 的超时与工具集配置做专项体检，并在不符合推荐值时给出中文提示。
 - 若遇 npx 依赖缓存导致的模块缺失，可按 `docs/troubleshooting-mcp.md` 的“npx @latest 常见问题与修复”章节清缓存预热，或改为全局二进制直连方案。
 
 ## 故障排查

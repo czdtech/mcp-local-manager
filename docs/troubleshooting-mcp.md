@@ -276,3 +276,18 @@ npx -y task-master-ai@latest --help  # 或 --version
 - 请至少配置一个可用 Provider 的 API Key（如 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`），否则最新版可能直接退出。
 - Node v22 出现 `punycode` 的 DeprecationWarning 可忽略。
 - 网络镜像导致的解析/超时问题，可清缓存后重试或先行“预热”。
+
+## 十、task-master-ai MCP 启动超时/握手失败
+
+症状：`task-master-ai` 在 Cursor / Gemini / VS Code MCP 面板中显示 `⚠ MCP client ... failed to start: handshaking with MCP server failed: connection closed: initialize response`，或长时间停在“加载工具/0 tools enabled”。
+
+根因：`npx` 首次拉包 + Task Master 默认一次性加载 36 个工具（≈21k tokens），常超过 MCP 默认 60s 启动时间，客户端直接断开握手。官方文档《Configuration》中“[MCP Tool Loading Configuration]”与“[MCP Timeout Configuration]”章节给出了减压方案。
+
+对策：
+
+1. **拉长 timeout**：在中央清单或客户端配置中添加 `"timeout": 300`（单位秒，可按需改 600），确保 Cursor/Gemini 等客户端在握手阶段允许 Task Master 完整加载。
+2. **减少一次加载的工具数**：在 `env` 中设置 `"TASK_MASTER_TOOLS": "standard"`（15 个常用工具）或 `"core"/"lean"`（7 个核心工具），可将上下文占用减半甚至 70%。
+3. **重新落地**：执行 `mcp run`（或使用 `mcp central template --template task-master-ai` 重建条目）后再写入目标客户端，并在目标客户端的 MCP 面板“关→开”该服务。
+4. **验证上游包可用**：`npx -y task-master-ai@latest --version`；若 CLI 仍报错，请检查本地 Node 版本 >= 18 与至少一个有效 API Key（`ANTHROPIC_API_KEY`/`OPENAI_API_KEY` 等）。
+
+以上 timeout / 工具集参数均为 Task Master 官方建议，若 docs 站点无法访问，可直接查看其仓库的 `docs/configuration.md` 获取同内容。额外地，本项目提供 `mcp central doctor`：当 `task-master-ai` 条目缺少 `timeout`、`timeout < 300` 或 `TASK_MASTER_TOOLS` 未设置/为 `all` 时，会在体检报告中标红并给出修复提示，便于在部署前统一校准配置。

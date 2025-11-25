@@ -45,7 +45,14 @@ def apply_codex(subset: dict, dry_run: bool=False) -> int:
     lines = ["\n# === MCP Servers 配置（由 MCP Local Manager 生成）==="]
     for name,info in subset.items():
         lines.append(f"\n[mcp_servers.{name}]")
-        lines.append("startup_timeout_sec = 60")
+        timeout = info.get('timeout') if isinstance(info, dict) else None
+        try:
+            timeout_sec = int(timeout) if timeout is not None else 60
+        except Exception:
+            timeout_sec = 60
+        if timeout_sec < 1:
+            timeout_sec = 60
+        lines.append(f"startup_timeout_sec = {timeout_sec}")
         lines.append(f"command = \"{info.get('command','')}\"")
         args = info.get('args') or []
         if args:
@@ -81,6 +88,8 @@ def apply_json_map(label: str, path: Path, subset: dict, top_key: str='mcpServer
                 server_config['args'] = info['args']
             if 'env' in info and info['env']:
                 server_config['env'] = info['env']
+            if 'timeout' in info and info['timeout'] is not None:
+                server_config['timeout'] = info['timeout']
             server_config['type'] = 'stdio'
             servers_config[name] = server_config
         obj['mcpServers'] = servers_config

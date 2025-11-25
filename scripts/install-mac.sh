@@ -105,7 +105,11 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
       "enabled": true,
       "type": "local",
       "command": "npx",
-      "args": ["-y","task-master-ai@latest"]
+      "args": ["-y","task-master-ai@latest"],
+      "timeout": 300,
+      "env": {
+        "TASK_MASTER_TOOLS": "standard"
+      }
     }
   }
 }

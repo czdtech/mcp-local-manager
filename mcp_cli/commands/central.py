@@ -359,7 +359,12 @@ _BUILTIN_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "serena": {"command": "~/.local/bin/serena", "args": ["start-mcp-server", "--context", "desktop-app"]},
     "codex-cli": {"command": "npx", "args": ["-y", "@cexll/codex-mcp-server@latest"]},
     "context7": {"command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"]},
-    "task-master-ai": {"command": "npx", "args": ["-y", "task-master-ai@latest"]},
+    "task-master-ai": {
+        "command": "npx",
+        "args": ["-y", "task-master-ai@latest"],
+        "timeout": 300,
+        "env": {"TASK_MASTER_TOOLS": "standard"},
+    },
     "chrome-devtools": {"command": "npx", "args": ["-y", "chrome-devtools-mcp@latest"]},
     "custom-npx": {"command": "npx", "args": ["-y", "<package>@latest"]},
 }
@@ -473,6 +478,26 @@ def _cmd_doctor(args) -> int:
         url = info.get("url")
         if url and not _URL_RE.match(str(url)):
             c_issues.append("url 格式不合法")
+
+        # task-master-ai 专项体检：timeout 与 TASK_MASTER_TOOLS 建议值
+        if name == "task-master-ai":
+            timeout = info.get("timeout")
+            try:
+                timeout_val = int(timeout) if timeout is not None else None
+            except Exception:
+                timeout_val = None
+            if timeout_val is None:
+                c_issues.append("task-master-ai 未配置 timeout（建议 >= 300 秒，例如 300/600）")
+            elif timeout_val < 300:
+                c_issues.append(f"task-master-ai timeout 过小: {timeout_val}（建议至少 300）")
+
+            env = info.get("env") or {}
+            tools_mode = str(env.get("TASK_MASTER_TOOLS", "")).strip()
+            if not tools_mode:
+                c_issues.append("task-master-ai 未设置 env.TASK_MASTER_TOOLS（建议 standard，或按需 core/lean/自定义列表）")
+            elif tools_mode.lower() == "all":
+                c_issues.append("task-master-ai 使用 TASK_MASTER_TOOLS=all，可能导致加载过慢和 token 占用过高（建议改为 standard 或 core）")
+
         per[name] = {
             "status": "passed" if not c_issues else "failed",
             "issues": c_issues,

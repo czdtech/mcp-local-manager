@@ -57,6 +57,12 @@
             "description": "URL for remote servers",
             "minLength": 1
           },
+          "timeout": {
+            "type": "integer",
+            "description": "Timeout (seconds) for MCP clients that honor this field",
+            "minimum": 1,
+            "maximum": 3600
+          },
           "headers": {
             "type": "object",
             "description": "HTTP headers for remote servers",
