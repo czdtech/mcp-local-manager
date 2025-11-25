@@ -367,9 +367,8 @@ show_upgrade_summary() {
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo
     echo "新功能特性:"
-    echo "• 统一命令: mcp status|run|check|clear|central (均交互式, status/check 只读)"
+    echo "• 统一命令: mcp status|run|check|central (均交互式, status/check 只读)"
     echo "• 安全预览: 已内置在交互步骤中"
-    echo "• 一键清理: mcp clear (交互式选择目标)"
     echo "• 增强健壮性: 更好的错误处理和自动备份"
     echo
     echo "推荐下一步:"

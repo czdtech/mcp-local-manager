@@ -367,6 +367,32 @@ _BUILTIN_TEMPLATES: Dict[str, Dict[str, Any]] = {
     },
     "chrome-devtools": {"command": "npx", "args": ["-y", "chrome-devtools-mcp@latest"]},
     "custom-npx": {"command": "npx", "args": ["-y", "<package>@latest"]},
+    "frontend-automation": {
+        "command": "npx",
+        "args": ["-y", "@playwright/mcp@latest", "--headless"],
+        "env": {"PLAYWRIGHT_BROWSERS_PATH": "0"},
+    },
+    "doc-search": {
+        "command": "npx",
+        "args": ["-y", "mcp-server-filesystem@latest", "~/work", "~/.mcp-central"],
+    },
+    "task-suite": {
+        "command": "npx",
+        "args": ["-y", "task-master-ai@latest"],
+        "timeout": 300,
+        "env": {"TASK_MASTER_TOOLS": "standard"},
+    },
+}
+
+_TPL_DESC = {
+    "frontend-automation": "前端自动化：@playwright/mcp headless + 预设浏览器路径",
+    "doc-search": "文档/本地检索：filesystem 指向 ~/work 与 ~/.mcp-central",
+    "task-suite": "任务管理组合：task-master-ai（timeout 300 + standard 工具集）",
+    "task-master-ai": "官方推荐：timeout 300 + TASK_MASTER_TOOLS=standard",
+    "filesystem": "最小文件系统服务",
+    "playwright": "浏览器自动化（headless）",
+    "chrome-devtools": "DevTools 浏览器控制",
+    "context7": "Context7 文档检索",
 }
 
 
@@ -465,6 +491,7 @@ def _cmd_doctor(args) -> int:
 
     for name, info in servers.items():
         c_issues: list[str] = []
+        suggestions: list[str] = []
         cmd = info.get("command")
         if not cmd or not isinstance(cmd, str):
             c_issues.append("缺少 command 或类型错误")
@@ -472,13 +499,14 @@ def _cmd_doctor(args) -> int:
             if cmd == "npx":
                 if not _which("npx"):
                     c_issues.append("npx 不可用")
+                    suggestions.append("请安装 node/npm 或使用全局二进制：npm i -g <pkg>@latest 并更新 command")
             else:
                 if not _which(cmd):
                     c_issues.append(f"命令未找到: {cmd}")
+                    suggestions.append(f"请确保 {cmd} 在 PATH 中，或改为 npx -y <pkg>@latest")
         url = info.get("url")
         if url and not _URL_RE.match(str(url)):
             c_issues.append("url 格式不合法")
-
         # task-master-ai 专项体检：timeout 与 TASK_MASTER_TOOLS 建议值
         if name == "task-master-ai":
             timeout = info.get("timeout")
@@ -488,19 +516,24 @@ def _cmd_doctor(args) -> int:
                 timeout_val = None
             if timeout_val is None:
                 c_issues.append("task-master-ai 未配置 timeout（建议 >= 300 秒，例如 300/600）")
+                suggestions.append("操作示例: mcp central update task-master-ai --json（编辑输出或文件，将 timeout 设置为 300）")
             elif timeout_val < 300:
                 c_issues.append(f"task-master-ai timeout 过小: {timeout_val}（建议至少 300）")
+                suggestions.append("操作示例: mcp central update task-master-ai --json（编辑输出或文件，将 timeout 调整为 300/600）")
 
             env = info.get("env") or {}
             tools_mode = str(env.get("TASK_MASTER_TOOLS", "")).strip()
             if not tools_mode:
                 c_issues.append("task-master-ai 未设置 env.TASK_MASTER_TOOLS（建议 standard，或按需 core/lean/自定义列表）")
+                suggestions.append("示例: mcp central update task-master-ai --set-env TASK_MASTER_TOOLS=standard")
             elif tools_mode.lower() == "all":
-                c_issues.append("task-master-ai 使用 TASK_MASTER_TOOLS=all，可能导致加载过慢和 token 占用过高（建议改为 standard 或 core）")
+                c_issues.append("task-master-ai 使用 TASK_MASTER_TOOLS=all，可能导致加载过慢（建议改为 standard/core/lean）")
+                suggestions.append("示例: mcp central update task-master-ai --set-env TASK_MASTER_TOOLS=standard")
 
         per[name] = {
             "status": "passed" if not c_issues else "failed",
             "issues": c_issues,
+            "suggestions": suggestions,
         }
         issues += [f"{name}: {x}" for x in c_issues]
     status = "passed" if not issues else "failed"
@@ -648,7 +681,9 @@ def run(args) -> int:
         if getattr(args,'interactive',False) or not getattr(args,'template',None) or not getattr(args,'name',None):
             print('可选模板:')
             for i,k in enumerate(sorted(_BUILTIN_TEMPLATES.keys()), start=1):
-                print(f"  {i}) {k}")
+                desc = _TPL_DESC.get(k, '')
+                extra = f" - {desc}" if desc else ''
+                print(f"  {i}) {k}{extra}")
             t = input('选择模板编号（或输入名称）: ').strip()
             keys=sorted(_BUILTIN_TEMPLATES.keys())
             if t.isdigit():

@@ -9,6 +9,34 @@ import json
 from pathlib import Path
 from .. import utils as U
 
+# 预设场景包（与 CLI 参数/交互菜单保持一致）
+PRESET_PACKS = {
+    "cursor-minimal": {
+        "desc": "Cursor 最小包：task-master-ai + context7",
+        "servers": ["task-master-ai", "context7"],
+    },
+    "claude-basic": {
+        "desc": "Claude 文件+注册表：task-master-ai + context7",
+        "servers": ["task-master-ai", "context7"],
+    },
+    "vscode-user-basic": {
+        "desc": "VS Code(User) 基础：task-master-ai + context7",
+        "servers": ["task-master-ai", "context7"],
+    },
+    "frontend-automation": {
+        "desc": "前端自动化：playwright + chrome-devtools",
+        "servers": ["playwright", "chrome-devtools"],
+    },
+    "doc-search": {
+        "desc": "文档/本地检索：filesystem + context7",
+        "servers": ["filesystem", "context7"],
+    },
+    "task-suite": {
+        "desc": "任务管理：task-master-ai + context7（timeout/env 建议）",
+        "servers": ["task-master-ai", "context7"],
+    },
+}
+
 
 def _expand_tilde(v: object) -> object:
     if isinstance(v, str):
@@ -180,33 +208,66 @@ def apply_claude(subset: dict, verbose: bool=False, dry_run: bool=False) -> int:
     return 0
 
 
+def _preview(client: str, subset: dict, dry_run: bool) -> None:
+    names = sorted(subset.keys())
+    print('— 差异预览 —')
+    print(f'目标客户端: {client}')
+    print('服务器集合: ' + (', '.join(names) if names else '(empty)'))
+    if client == 'codex':
+        print(f'目标文件  : {U.HOME/".codex"/"config.toml"}')
+    elif client == 'gemini':
+        print(f'目标文件  : {U.HOME/".gemini"/"settings.json"}')
+    elif client == 'iflow':
+        print(f'目标文件  : {U.HOME/".iflow"/"settings.json"}')
+    elif client == 'droid':
+        print(f'目标文件  : {U.HOME/".factory"/"mcp.json"}')
+        print('注册表    : droid mcp remove/add (先删再加)')
+    elif client == 'cursor':
+        print(f'目标文件  : {U.HOME/".cursor"/"mcp.json"}')
+    elif client == 'claude':
+        print(f'目标文件  : {U.HOME/".claude"/"settings.json"}')
+        print('注册表    : claude mcp remove/add')
+    elif client == 'vscode-user':
+        print(f'目标文件  : {U._vscode_user_path()}')
+    elif client == 'vscode-insiders':
+        print(f'目标文件  : {U._vscode_insiders_path()}')
+    print(f'模式      : {"DRY-RUN 预览" if dry_run else "实际写入"}')
+
+
 def run(args) -> int:
     """run 子命令主入口。
 
     支持两种使用方式：
     1) `mcp run` 交互式：函数内部引导选择 client 与 servers；
-    2) 预选模式：当 args 上已经带有 `client` 与 `servers` 时
-      （例如 `mcp pick` 调用）直接按给定集合落地，避免重复交互。
+    2) 预选模式：当 args 上已经带有 `client` 与 `servers` 或 `preset` 时直接按给定集合落地，避免重复交互。
     """
     # 是否 dry-run：兼容未来从外层传入 _dry_run 标记
-    dry_run = bool(getattr(args, '_dry_run', False))
+    dry_run = bool(getattr(args, '_dry_run', False) or getattr(args, 'dry_run', False))
 
     client = getattr(args, 'client', None)
     pre_servers = getattr(args, 'servers', None)
+    pre_preset = getattr(args, 'preset', None)
+    preselected = bool(client and (pre_servers or pre_preset))
     subset = None
 
-    # 预选模式：pick 等入口会构造 client/servers 参数
-    if client and pre_servers:
+    # 预选模式：参数构造 client/servers 或 preset
+    if client and (pre_servers or pre_preset):
         _, servers = U.load_central_servers()
-        if isinstance(pre_servers, str):
-            names = [s for s in pre_servers.split(',') if s.strip()]
-        elif isinstance(pre_servers, (list, tuple)):
-            names = [str(s) for s in pre_servers if str(s).strip()]
+        if pre_servers:
+            if isinstance(pre_servers, str):
+                names = [s for s in pre_servers.split(',') if s.strip()]
+            elif isinstance(pre_servers, (list, tuple)):
+                names = [str(s) for s in pre_servers if str(s).strip()]
+            else:
+                names = []
         else:
-            names = []
-        names = [n for n in names if n in servers]
-        if not names:
-            print('[ERR] 选定的服务器在中央清单中不存在')
+            if pre_preset not in PRESET_PACKS:
+                print(f'[ERR] 未知预设: {pre_preset}')
+                return 1
+            names = list(PRESET_PACKS[pre_preset]['servers'])
+        missing = [n for n in names if n not in servers]
+        if missing:
+            print(f"[ERR] 选定的服务器不在中央清单: {', '.join(missing)}")
             return 1
         subset = {n: servers[n] for n in names}
     else:
@@ -238,24 +299,51 @@ def run(args) -> int:
         if not names:
             print('[ERR] 中央清单为空')
             return 1
-        print('\n选择要启用的 MCP（空格分隔编号；留空=第一个）:')
-        for i,n in enumerate(names, start=1):
-            print(f'  {i:2}) {n}')
-        if os.environ.get('MCP_DEBUG'):
-            print('[DBG] before picks', file=os.sys.stderr)
-        picks = input('输入编号列表: ').strip().split()
-        if os.environ.get('MCP_DEBUG'):
-            print('[DBG] got picks', picks, file=os.sys.stderr)
+        # 预设/场景包优先
+        presets = list(PRESET_PACKS.items())
+        print('\n选择预设/场景包 (回车=1, 0=手动逐项选择):')
+        for i,(k,v) in enumerate(presets, start=1):
+            print(f'  {i}) {k} - {v["desc"]}')
+        pick_preset_raw = input('输入编号: ').strip()
         chosen = []
-        for p in picks:
-            if p.isdigit() and 1 <= int(p) <= len(names):
-                chosen.append(names[int(p)-1])
+        if pick_preset_raw in ('', None):
+            pick_preset_raw = '1'
+        if pick_preset_raw.isdigit() and int(pick_preset_raw) == 0:
+            pick_preset_raw = None  # 走手动
+        if pick_preset_raw and pick_preset_raw.isdigit() and 1 <= int(pick_preset_raw) <= len(presets):
+            sel_name = presets[int(pick_preset_raw)-1][0]
+            preset_servers = PRESET_PACKS.get(sel_name, {}).get('servers', [])
+            missing = [n for n in preset_servers if n not in servers]
+            if missing:
+                print(f"[WARN] 预设 {sel_name} 中部分条目不在中央清单，已跳过: {', '.join(missing)}")
+            chosen = [n for n in preset_servers if n in servers]
         if not chosen:
-            chosen = [names[0]]
+            print('\n选择要启用的 MCP（空格分隔编号；留空=第一个）:')
+            for i,n in enumerate(names, start=1):
+                print(f'  {i:2}) {n}')
+            if os.environ.get('MCP_DEBUG'):
+                print('[DBG] before picks', file=os.sys.stderr)
+            picks = input('输入编号列表: ').strip().split()
+            if os.environ.get('MCP_DEBUG'):
+                print('[DBG] got picks', picks, file=os.sys.stderr)
+            for p in picks:
+                if p.isdigit() and 1 <= int(p) <= len(names):
+                    chosen.append(names[int(p)-1])
+            if not chosen:
+                chosen = [names[0]]
         subset = {n: servers[n] for n in chosen}
 
     if os.environ.get('MCP_DEBUG'):
         print('[DBG] client', client, file=os.sys.stderr)
+
+    # 非交互模式的预览与确认
+    if (preselected or dry_run) and client and subset:
+        _preview(client, subset, dry_run)
+        if preselected and not dry_run and not getattr(args, 'yes', False):
+            reply = input('确认写入? [y/N]: ').strip().lower() or 'n'
+            if reply != 'y':
+                print('已取消')
+                return 0
 
     if client == 'claude':
         rc = apply_claude(subset, verbose=getattr(args, 'verbose', False), dry_run=dry_run)

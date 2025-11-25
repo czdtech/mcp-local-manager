@@ -10,7 +10,6 @@
   - commands/
     - status.py：只读状态查看。
     - check.py：只读健康检查。
-    - clear.py：清理 MCP 配置（写入 + 外部注册表）。
     - run.py：落地 MCP 配置（写入 + 可选外部命令）。
 - bin/mcp-auto-sync.py：脚本版；bin/mcp_auto_sync.py：模块版（供测试导入）。
 
@@ -42,7 +41,6 @@ pytest -q                # 全量测试（tests/conftest.py 已隔离 HOME）
 ## 迁移路线
 
 - 阶段 1（完成）：status/check 模块化。
-- 阶段 2（完成）：clear 模块化。
 - 阶段 3（完成）：run 模块化。
 - 后续（进行中）：逐步移除 bin/mcp 中历史兼容转发函数，并将相关单测从 bin 迁到 mcp_cli。
 

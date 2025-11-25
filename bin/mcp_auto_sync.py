@@ -41,8 +41,7 @@ def log_err(m):  print(f"{RED}✗{NC} {m}")
 def backup(p: Path):
     if not p.exists():
         return None
-    ts = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
-    b = p.with_suffix(f'.{ts}.backup')
+    b = p.with_name(p.name + '.backup')
     shutil.copy2(p, b)
     log_info(f'已备份: {b.name}')
     return b

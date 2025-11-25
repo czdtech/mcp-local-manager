@@ -71,8 +71,7 @@ def save_json(p: Path, obj: Dict[str, Any]) -> None:
 def backup(p: Path) -> Optional[Path]:
     if not p.exists():
         return None
-    ts = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
-    b = p.with_suffix(f'.{ts}.backup')
+    b = p.with_name(p.name + '.backup')
     shutil.copy2(p, b)
     return b
 

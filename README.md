@@ -19,9 +19,14 @@ bash scripts/mcp-check.sh     # 只读健康检查
 ### CLI 命令（推荐日常使用）
 
 ```bash
-运行 `mcp run` / `mcp clear` / `mcp central` 进入交互式向导完成配置与管理；
+运行 `mcp run` / `mcp central` 进入交互式向导完成配置与管理；
 只读命令 `mcp status` / `mcp check` 直接输出结果。
 ```
+
+### 新手路径（场景包，数字即用）
+- `mcp run` → 选择客户端 → 选择预设包（回车=1 默认包，例如 Cursor/Claude/VS Code 基础：task-master-ai+context7）→ 确认落地。
+- 想要非交互：`mcp run --client cursor --preset cursor-minimal --yes`（可先 `--dry-run` 预览差异）。
+- 如需清空，可手动删除对应客户端 MCP 文件/注册表（已移除 `mcp clear`）。
 
 ### 交互预览与确认
 
@@ -127,7 +132,7 @@ mcp status cursor
 
 ### 交互入口
 
-`mcp run` / `mcp clear` / `mcp central` 进入交互式选择与确认流程。
+`mcp run` / `mcp central` 进入交互式选择与确认流程。
 
 ### run
 
@@ -142,13 +147,6 @@ mcp check
 ```
 
 说明：`mcp check` 为轻量只读体检；深度体检请运行 `scripts/mcp-check.sh`。
-
-### clear
-
-运行后按提示选择要清理的客户端并确认（支持环境变量 `MCP_CLEAR_YES=1` 自动确认）。
-
-说明：
-- 会对相关配置文件做时间戳备份；覆盖范围：Claude(文件+注册表)、Codex、Gemini、iFlow、Droid、Cursor、VS Code(User/Insiders)。
 
 ## 配置验证
 
@@ -286,14 +284,14 @@ mcp check
 
 已有配置不一致时的推荐流程：
 
-1. 先运行 \`scripts/mcp-check.sh\` 只读体检，记录现状
-2. 准备/确认 \`~/.mcp-central/config/mcp-servers.json\`（统一清单，未显式 false 的都视为启用）
+1. 先运行 `scripts/mcp-check.sh` 只读体检，记录现状
+2. 准备/确认 `~/.mcp-central/config/mcp-servers.json`（统一清单，未显式 false 的都视为启用）
 4. 启动某个 CLI 前，用 `mcp run` 精确下发所需 MCP
-5. 如需全量改写各目标，也可用 \`scripts/mcp-sync.sh\`
+5. 如需全量改写各目标，也可用 `scripts/mcp-sync.sh`
 
 **注意事项**：
 - 只改 MCP：本项目所有脚本都"仅替换 MCP 配置段"，不会触碰其它设置
-- 自动备份：每次落地前都会生成 \`*.backup\`，可随时回滚
+- 自动备份：每个目标文件仅保留一个 \`*.backup\`（单槽覆盖），可用 \`mcp undo <backup>\` 回滚
 - Cursor 建议只保留 \`~/.cursor/mcp.json\`，避免把 \`mcpServers\` 放在 \`~/.config/cursor/User/settings.json\` 造成重复展示
 - VS Code 使用 \`mcp.json\`（顶层 \`servers\`），不要把清单放入 \`settings.json\`
 

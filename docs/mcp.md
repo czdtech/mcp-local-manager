@@ -46,16 +46,8 @@ mcp check
 
 （已收敛）不再提供参数式配置命令，全部改为交互模式：
 
-- pick（隐藏入口）
-  - 保留为向后兼容的交互入口；建议直接使用 `mcp run`。
-
 - run（交互式）
   - 运行 `mcp run` 后，依提示选择客户端与服务集合；可选输入启动命令；直接回车仅落地不启动。
-
-- clear（交互式）
-  - 进入交互式选择要清理的客户端并确认。
-  - 会备份配置文件；在交互中展示预览并确认。
-  - 覆盖：Claude(文件+注册表)、Codex、Gemini、iFlow、Droid、Cursor、VS Code(User/Insiders)。
 
 ## 注意事项
 
@@ -64,7 +56,7 @@ mcp check
 - IDE 专用文件：
   - VS Code：CLI 会按平台自动定位（macOS 使用 `~/Library/Application Support/...`，Linux 使用 `~/.config/...`）
   - Cursor：~/.cursor/mcp.json
-- 文件备份：所有改写会生成带时间戳的 .backup 便于回滚。
+- 文件备份：所有改写会生成单槽 `.backup` 覆盖，配合 `mcp undo` 可回滚。
 - 体检：`mcp check` 为轻量只读体检；如需连通性等深度体检，请运行 `scripts/mcp-check.sh`。
 - 中央清单建议：Node 生态服务显式写 `npx -y <package>@latest`，保持最新；如需稳定，可对单个服务改为固定版本（`@x.y.z`）。
 - 成本建议：为降低 Token 消耗，建议 CLI（codex/claude/gemini/iflow/droid）按需落地甚至默认不落地；IDE 仅启用必要 MCP（如 `task-master-ai`、`context7`）。

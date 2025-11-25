@@ -1,10 +1,10 @@
 # Changelog
 
-## v1.3.4 (2025-11-14)
+## v1.3.5 (未发布)
 
-- 修复：`mcp pick` 通过预选 client/servers 调用时不再重复进入二次交互，避免交互卡住；现在会直接按 pick 中选择的集合落地，并只在最后一步提示是否启动相关程序。
-- 测试：新增 `TestMCPPick` 集成测试，覆盖 `mcp pick` 的基础交互流程，防止回归。
-- 文档：对齐 README/CHANGELOG，将 README 中的“版本历史”简化为指向 CHANGELOG，并更新 CHANGELOG 中对 `mcp clear`/`mcp run`/体检脚本等用法的描述，使之完全匹配当前 CLI 与脚本实现（不再提及 `--client`/`-n`/`-y`/`mcp check --probe` 等旧参数）。
+- 破坏性变更：移除 `mcp pick` 与 `mcp clear` 子命令，统一通过 `mcp run`/`mcp central`/`mcp status`/`mcp check`/`mcp undo`。
+- 备份策略：改为单槽 `*.backup` 覆盖，避免备份堆积；提供 `mcp undo` 回滚。
+- 文档：清理 pick/clear 相关描述，对齐新 CLI。
 
 ## v1.3.2 (2025-11-10)
 
@@ -15,9 +15,8 @@
 
 ## v1.3.1 (2025-11-10)
 
-- 新增（CLI）：`mcp clear` 一键清除所有 CLI/IDE 的 MCP 配置；采用交互式选择目标客户端并在写入前显示预览与确认，不再提供 `--client`/`-n`/`-y` 等参数。覆盖 Claude(文件+注册表)、Codex、Gemini、iFlow、Droid、Cursor、VS Code(User/Insiders)。
 - 修复（Droid）：按官方规范写入 `~/.factory/mcp.json` 顶层 `mcpServers`，并在 `mcp run` 交互中选择 Droid 时改为“先 remove 再 add”强制重注册，确保 `/mcp` 面板即时、准确地反映中央清单。
-- 文档：更新 README/docs，明确 Droid 的注册表对齐策略与使用示例；Troubleshooting 增补 `droid mcp add` 推荐写法与 env 传参说明；新增 `clear` 用法文档。
+- 文档：更新 README/docs，明确 Droid 的注册表对齐策略与使用示例；Troubleshooting 增补 `droid mcp add` 推荐写法与 env 传参说明。
 
 ## v1.3.0 (2025-11-06)
 
@@ -32,7 +31,7 @@
 
 ## v1.2.2 (2025-11-06)
 
-- 行为变更：安装脚本默认不再自动同步/落地 MCP，仅生成统一清单并执行体检；需要落地时使用 `mcp pick/run` 或可选 `scripts/mcp-sync.sh`。
+- 行为变更：安装脚本默认不再自动同步/落地 MCP，仅生成统一清单并执行体检；需要落地时使用 `mcp run` 或可选 `scripts/mcp-sync.sh`。
 - 脚本：`scripts/install-mac.sh` 去除 `mcp-auto-sync.py sync` 调用，新增明确提示“安装默认不落地 MCP，需用户自行选择 via mcp”。保留 npx 预热为可选步骤。
 - 文档：
   - `README.md` 更新快速使用与目录说明，强调按需落地与最小化启用；`onboard-cursor-minimal.sh` 标注为“可选”。
@@ -67,7 +66,7 @@
 
 - CLI: 兼容 Python 3.9（添加 `from __future__ import annotations` 延迟注解求值）。
 - 清理：移除未使用的 nvm 相关遗留代码与未定义引用。
-- 行为：无破坏性变更；可用子命令不变（status/pick/run/check）。
+- 行为：无破坏性变更；可用子命令不变（status/run/check）。
 - 升级建议：
   - 重新链接或更新 PATH 到最新 `bin/mcp`。
   - 执行 `mcp -h` 验证；如需，运行 `mcp check` 做只读体检。

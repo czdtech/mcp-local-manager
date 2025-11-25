@@ -76,8 +76,7 @@ def save_json(p: Path, obj: dict):
 def backup(p: Path):
     if not p.exists():
         return None
-    ts = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
-    b = p.with_suffix(f'.{ts}.backup')
+    b = p.with_name(p.name + '.backup')
     shutil.copy2(p, b)
     return b
 
@@ -363,10 +362,30 @@ def _clear_claude_registry(verbose: bool=False):
     print(f"[OK] 已清理 Claude 注册表: ok={ok} fail={fail}")
     return 0
 
-def cmd_clear(args):
-    from mcp_cli.commands import clear as _clear
-    setattr(args, '_dry_run', False)
-    return _clear.run(args)
+def cmd_undo(args):
+    """从 *.backup 恢复；若未提供 dest，尝试基于文件名推断原路径。"""
+    backup_path = Path(args.backup).expanduser()
+    dest = Path(args.dest).expanduser() if getattr(args, 'dest', None) else None
+    if not backup_path.exists():
+        print(f"[ERR] 备份文件不存在: {backup_path}")
+        return 1
+    if dest is None:
+        name = backup_path.name
+        if name.endswith('.backup'):
+            name = name[:-7]
+        # 去掉时间戳片段（形如 .20240510_120000）
+        parts = name.split('.')
+        if parts and len(parts[-1]) == 15 and parts[-1][8] == '_':
+            parts = parts[:-1]
+        dest = backup_path.with_name('.'.join(parts) if parts else name)
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(backup_path, dest)
+        print(f"[OK] 已恢复到: {dest}")
+        return 0
+    except Exception as e:
+        print(f"[ERR] 恢复失败: {e}")
+        return 1
 
 def apply_json_map(label, path: Path, subset: dict, top_key='mcpServers'):
     from mcp_cli.commands.run import apply_json_map as _aj
@@ -375,44 +394,6 @@ def apply_json_map(label, path: Path, subset: dict, top_key='mcpServers'):
 def apply_claude(subset, verbose: bool=False):
     from mcp_cli.commands.run import apply_claude as _acl
     return _acl(subset, verbose=verbose, dry_run=False)
-
-def cmd_pick(args):
-    # 简易交互：数字选择客户端 + 多选服务
-    clients = [
-        ('claude','Claude CLI'),
-        ('codex','Codex CLI'),
-        ('gemini','Gemini'),
-        ('iflow','iFlow'),
-        ('droid','Droid CLI'),
-        ('cursor','Cursor'),
-        ('vscode-user','VS Code(User)'),
-        ('vscode-insiders','VS Code(Insiders)')
-    ]
-    print('选择目标 CLI/IDE:')
-    for i,(key,label) in enumerate(clients, start=1):
-        print(f'  {i}) {label} [{key}]')
-    cidx = int(input('输入编号: ').strip() or '1')
-    client = clients[cidx-1][0]
-    # 服务器多选
-    _, servers = load_central_servers()
-    names = sorted(servers.keys())
-    print('\n选择要启用的 MCP（空格分隔编号）:')
-    for i,n in enumerate(names, start=1):
-        print(f'  {i:2}) {n}')
-    picks = input('输入编号列表: ').strip().split()
-    chosen = []
-    for p in picks:
-        if p.isdigit() and 1 <= int(p) <= len(names):
-            chosen.append(names[int(p)-1])
-    if not chosen:
-        print('[ERR] 未选择任何服务器')
-        return 1
-    print(f'将应用到 {client}:', ', '.join(chosen))
-    ok = input('确认? [y/N]: ').strip().lower() == 'y'
-    if not ok:
-        print('已取消')
-        return 0
-    return cmd_run(argparse.Namespace(client=client, servers=','.join(chosen), exec=[]))
 
 def main():
     p = argparse.ArgumentParser(
@@ -426,7 +407,6 @@ def main():
         epilog=(
             '常用入口:\n'
             '  - mcp run      进入交互式向导, 按客户端落地所选 MCP (最后可选启动)\n'
-            '  - mcp clear    进入交互式向导, 清理各客户端 MCP 配置 (含 Claude 注册表)\n'
             '  - mcp central  进入交互式向导, 管理中央清单 (CRUD/模板/导入导出/校验/体检)\n'
             '只读命令:\n'
             '  - mcp status [client]  查看按客户端/IDE 的实际启用状态\n'
@@ -446,19 +426,19 @@ def main():
     # 已移除：profile-save / profile-apply
     # （已移除 apply-cli 子命令）
 
-    sp_pick = sub.add_parser('pick', help=__import__('argparse').SUPPRESS)
-    sp_pick.set_defaults(func=cmd_pick)
+    # 已移除：pick
 
     # 已移除：sync（全量同步）
-    sp_run = sub.add_parser('run', help='交互式下发所需 MCP；步骤：选择客户端 → 选择服务 → 确认写入 → 可选启动')
+    sp_run = sub.add_parser('run', help='交互式下发所需 MCP；支持预设场景、非交互参数与差异预览')
+    sp_run.add_argument('--client', help='预选客户端（跳过交互）')
+    sp_run.add_argument('--servers', help='预选服务器列表，逗号分隔（跳过交互）')
+    sp_run.add_argument('--preset', help='预设场景包名称（与交互菜单一致）')
+    sp_run.add_argument('--yes', action='store_true', help='非交互模式自动确认写入')
+    sp_run.add_argument('--dry-run', action='store_true', help='仅预览差异，不写入')
     sp_run.set_defaults(func=cmd_run)
     # 旧版 central 定义块已移除（统一使用新版 central 定义）
 
     sub.add_parser('check', help='只读体检').set_defaults(func=cmd_check)
-
-    # 新增：clear 一键清除所有 CLI/IDE 的 MCP 配置
-    sp_clear = sub.add_parser('clear', help='交互式清理各客户端 MCP 配置（含 Claude 注册表；写入前有摘要与确认）')
-    sp_clear.set_defaults(func=cmd_clear)
 
     # central：管理中央清单
     sp_central = sub.add_parser('central', help='交互式管理中央 MCP 清单（新增/更新/模板/导入导出/校验/体检）')
@@ -552,6 +532,12 @@ def main():
 
     # 复用上方已定义的 cmd_central
     sp_central.set_defaults(func=cmd_central)
+
+    # undo：从备份恢复
+    sp_undo = sub.add_parser('undo', help='从 *.backup 文件恢复原始配置')
+    sp_undo.add_argument('backup', help='备份文件路径（*.backup）')
+    sp_undo.add_argument('--dest', help='可选：明确指定恢复目标路径')
+    sp_undo.set_defaults(func=cmd_undo)
 
     args = p.parse_args()
     rc = args.func(args)
