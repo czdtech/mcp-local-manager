@@ -17,3 +17,8 @@ def _run_env(args: list[str], input_str: str = ''):
 def test_run_interactive_callable():
     r = _run_env(['run'], input_str='\n\n\n')
     assert r.returncode in (0,1)
+
+
+def test_clear_interactive_callable():
+    r = _run_env(['clear'], input_str='\n'+'n\n')
+    assert r.returncode == 0

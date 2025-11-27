@@ -1,10 +1,12 @@
 # Changelog
 
-## v1.3.5 (未发布)
+## v1.3.5 (2025-11-27)
 
-- 破坏性变更：移除 `mcp pick` 与 `mcp clear` 子命令，统一通过 `mcp run`/`mcp central`/`mcp status`/`mcp check`/`mcp undo`。
+- 破坏性变更：移除旧版 `mcp pick` 子命令，统一通过 `mcp run`/`mcp central`/`mcp status`/`mcp check`/`mcp undo` 管理配置。
 - 备份策略：改为单槽 `*.backup` 覆盖，避免备份堆积；提供 `mcp undo` 回滚。
-- 文档：清理 pick/clear 相关描述，对齐新 CLI。
+- CLI：按用户反馈恢复并加强 `mcp clear`，支持 `--client/--dry-run/--yes`，单槽备份；未知客户端参数会报错并保持现有配置不变。
+- CLI：`mcp run` 新增 `--localize` 选项，可在一次 run 中为当前选择的 npx 服务执行本地化并写入 `~/.mcp-local/resolved.json`，实现“边选择边本地化”的混合配置；Claude 注册表同步逻辑改为使用应用本地化覆盖后的 `command/args` 重建条目。
+- 文档：清理 pick 相关描述，对齐新的 run/clear/localize 行为。
 
 ## v1.3.2 (2025-11-10)
 
@@ -37,7 +39,7 @@
   - `README.md` 更新快速使用与目录说明，强调按需落地与最小化启用；`onboard-cursor-minimal.sh` 标注为“可选”。
   - `docs/QUICKSTART-mac.md` 移除“执行同步”表述，明确安装脚本不落地。
   - `docs/troubleshooting-mcp.md` 说明“默认不自动同步”，保留 `mcp-sync.sh` 作为可选路径。
-- CLI 交互化：配置/管理能力改为交互模式；`-n/--dry-run` 已移除，预览与确认在交互步骤中完成。
+- CLI 交互化：配置/管理能力改为交互模式；全局 `-n/--dry-run` 已移除，预览与确认在交互步骤中完成，需要预览时使用子命令级 `--dry-run`（如 `mcp run --dry-run` / `mcp clear --dry-run`）。
  - 新增别名：已移除（统一使用 `mcp`）。
 
 ## v1.2.1 (2025-11-04)

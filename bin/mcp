@@ -388,6 +388,15 @@ def cmd_undo(args):
         print(f"[ERR] 恢复失败: {e}")
         return 1
 
+def cmd_clear(args):
+    from mcp_cli.commands import clear as _clear
+    setattr(args, '_dry_run', False)
+    return _clear.run(args)
+
+def cmd_localize(args):
+    from mcp_cli.commands import localize as _loc
+    return _loc.run(args)
+
 def apply_json_map(label, path: Path, subset: dict, top_key='mcpServers'):
     from mcp_cli.commands.run import apply_json_map as _aj
     return _aj(label, path, subset, top_key, dry_run=False)
@@ -436,10 +445,25 @@ def main():
     sp_run.add_argument('--preset', help='预设场景包名称（与交互菜单一致）')
     sp_run.add_argument('--yes', action='store_true', help='非交互模式自动确认写入')
     sp_run.add_argument('--dry-run', action='store_true', help='仅预览差异，不写入')
+    sp_run.add_argument('--localize', action='store_true', help='在本次 run 中为选定 npx 服务执行本地安装并切换为本地二进制')
     sp_run.set_defaults(func=cmd_run)
     # 旧版 central 定义块已移除（统一使用新版 central 定义）
 
     sub.add_parser('check', help='只读体检').set_defaults(func=cmd_check)
+
+    # clear：清理各客户端 MCP 配置
+    sp_clear = sub.add_parser('clear', help='清理各客户端 MCP 配置（文件+注册表，含预览与确认）')
+    sp_clear.add_argument('--client', action='append', help='指定要清理的客户端（可多次提供）')
+    sp_clear.add_argument('--yes', action='store_true', help='非交互模式自动确认')
+    sp_clear.add_argument('--dry-run', action='store_true', help='仅预览清理，不写入')
+    sp_clear.set_defaults(func=cmd_clear)
+
+    # localize：本地化/预热 MCP 服务器
+    sp_loc = sub.add_parser('localize', help='将中央清单中的 npx/uv 服务本地安装并切换为本地路径')
+    sp_loc.add_argument('--upgrade', action='store_true', help='检查最新版本并升级')
+    sp_loc.add_argument('--force', action='store_true', help='无视已安装强制重装')
+    sp_loc.add_argument('--prune', action='store_true', help='清理本地镜像并移除解析记录')
+    sp_loc.set_defaults(func=cmd_localize)
 
     # central：管理中央清单
     sp_central = sub.add_parser('central', help='交互式管理中央 MCP 清单（新增/更新/模板/导入导出/校验/体检）')

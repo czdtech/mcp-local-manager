@@ -200,3 +200,98 @@ class TestMCPIntegration:
                                   capture_output=True, text=True, timeout=10)
             assert result.returncode == 0, f"Failed to get status for {client}"
 
+
+class TestMCPIClear:
+    """Tests specifically for the clear command."""
+    
+    def setup_method(self):
+        """Setup for each test."""
+        self.bin_path = str(BIN_DIR / 'mcp')
+        # 为每个测试隔离 HOME，避免污染开发者真实配置目录
+        self.tmp_home = tempfile.mkdtemp(prefix='mcp_clear_test_home_')
+
+    def _env(self, extra: dict | None = None):
+        env = os.environ.copy()
+        env['HOME'] = self.tmp_home
+        if extra:
+            env.update(extra)
+        return env
+    
+    def test_clear_help(self):
+        """Test mcp clear --help command."""
+        result = subprocess.run([self.bin_path, 'clear', '--help'],
+                              env=self._env(),
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert 'clear' in result.stdout
+    
+    def test_clear_interactive(self):
+        result = subprocess.run([self.bin_path, 'clear'],
+                              env=self._env(),
+                              input='\n'+'y\n', capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0
+    
+    def test_clear_dry_run_all_clients(self):
+        result = subprocess.run([self.bin_path, 'clear'],
+                              env=self._env(),
+                              input='\n'+'y\n', capture_output=True, text=True, timeout=30)
+        assert result.returncode == 0
+    
+    def test_clear_requires_confirmation(self):
+        """Test that clear requires confirmation without --yes."""
+        result = subprocess.run([self.bin_path, 'clear'],
+                              env=self._env(),
+                              input='1\n'+'n\n',
+                              capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert '确认' in result.stdout
+        assert '已取消' in result.stdout
+    
+    def test_clear_confirm_yes(self):
+        result = subprocess.run([self.bin_path, 'clear'],
+                              env=self._env(),
+                              input='1\n'+'y\n', capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0
+    
+    def test_clear_invalid_client(self):
+        # 选择空行等价于全部，确认后成功退出
+        result = subprocess.run([self.bin_path, 'clear'],
+                              env=self._env(),
+                              input='\n'+'n\n', capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0
+    
+    def test_clear_multiple_clients_interactive(self):
+        result = subprocess.run([self.bin_path, 'clear'],
+                              env=self._env(),
+                              input='1 2 3\n'+'y\n', capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0
+    
+    def test_clear_verbose_mode(self):
+        result = subprocess.run([self.bin_path, 'clear'],
+                              env=self._env(),
+                              input='\n'+'y\n', capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0
+    
+    def test_clear_env_variable_yes(self):
+        """Test clear with MCP_CLEAR_YES=1 environment variable."""
+        env = self._env({'MCP_CLEAR_YES': '1'})
+        result = subprocess.run([self.bin_path, 'clear'],
+                              input='\n', env=env, capture_output=True, text=True, timeout=10)
+        
+        assert result.returncode == 0
+        assert '确认' not in result.stdout
+
+    def test_clear_unknown_client_is_safe_noop(self):
+        """未知 client 不应回退到“全部清理”，而是报错并不做任何修改。"""
+        env = self._env()
+        result = subprocess.run(
+            [self.bin_path, 'clear', '--client', 'typo', '--yes'],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 1
+        assert '未识别的客户端' in (result.stdout + result.stderr)

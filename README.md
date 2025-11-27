@@ -19,18 +19,19 @@ bash scripts/mcp-check.sh     # 只读健康检查
 ### CLI 命令（推荐日常使用）
 
 ```bash
-运行 `mcp run` / `mcp central` 进入交互式向导完成配置与管理；
+运行 `mcp run` / `mcp clear` / `mcp localize` / `mcp central` 进入交互式向导完成配置与管理；
 只读命令 `mcp status` / `mcp check` 直接输出结果。
 ```
 
 ### 新手路径（场景包，数字即用）
 - `mcp run` → 选择客户端 → 选择预设包（回车=1 默认包，例如 Cursor/Claude/VS Code 基础：task-master-ai+context7）→ 确认落地。
 - 想要非交互：`mcp run --client cursor --preset cursor-minimal --yes`（可先 `--dry-run` 预览差异）。
-- 如需清空，可手动删除对应客户端 MCP 文件/注册表（已移除 `mcp clear`）。
+- 需要清空：`mcp clear --client claude`（或交互选择）；支持 `--dry-run` 预览、`--yes` 自动确认。
+- 加速启动：`mcp localize` 一键本地化 npx 服务，`--upgrade` 升级本地版本，`--prune` 清理本地镜像；也可以在单次下发时使用 `mcp run --localize ...` 只为本次选择的 npx 服务做本地安装。
 
 ### 交互预览与确认
 
-所有写入操作在交互步骤中提供“变更摘要 + 最终确认”，不再提供 `-n/--dry-run` 全局参数。
+所有写入操作在交互步骤中提供“变更摘要 + 最终确认”，不再提供全局 `-n/--dry-run` 参数；需要预览时，请在具体子命令上使用 `--dry-run`（如 `mcp run --dry-run` / `mcp clear --dry-run`）。
 
 ### 新人一键最小落地（可选，推荐）
 
@@ -147,6 +148,14 @@ mcp check
 ```
 
 说明：`mcp check` 为轻量只读体检；深度体检请运行 `scripts/mcp-check.sh`。
+
+### clear
+
+交互/非交互清理各客户端 MCP 配置（含 Claude 注册表；写入前有摘要与确认）。
+
+说明：
+- 支持 `--client` 多选、`--dry-run` 预览、`--yes` 自动确认。
+- 会对相关配置文件做单槽备份（`.backup`），便于 `mcp undo` 回滚；覆盖范围：Claude(文件+注册表)、Codex、Gemini、iFlow、Droid、Cursor、VS Code(User/Insiders)。
 
 ## 配置验证
 

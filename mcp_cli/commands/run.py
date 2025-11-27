@@ -4,10 +4,12 @@ from __future__ import annotations
 """run 子命令实现（按客户端落地 MCP 配置并可启动命令）。"""
 
 import os
+import shutil
 import subprocess
 import json
 from pathlib import Path
 from .. import utils as U
+from . import localize as _localize
 
 # 预设场景包（与 CLI 参数/交互菜单保持一致）
 PRESET_PACKS = {
@@ -36,6 +38,162 @@ PRESET_PACKS = {
         "servers": ["task-master-ai", "context7"],
     },
 }
+
+
+def _localize_on_run(subset: dict, mode: str) -> None:
+    """在 mcp run 流程中按需执行本地化（npm 安装），并更新本地 resolved 映射。
+
+    mode:
+      - 'off'         : 不执行任何本地化
+      - 'interactive' : 交互式选择要本地化的条目
+      - 'all'         : 对当前 subset 中所有符合条件的 npx 服务执行本地化（非交互）
+    """
+    if mode not in ('interactive', 'all'):
+        return
+
+    resolved = _load_local_resolved()
+    candidates: dict[str, str] = {}
+
+    # 找出当前集合里可本地化但尚未成功落地的 npx 服务
+    for name, info in subset.items():
+        cmd = (info or {}).get('command')
+        args = (info or {}).get('args') or []
+        if cmd != 'npx' or not args:
+            continue
+        # 已有有效本地路径则跳过
+        existing = resolved.get(name)
+        if existing:
+            p = Path(existing)
+            if p.exists() and os.access(p, os.X_OK):
+                continue
+        # 提取真实包名 spec（跳过 -y/--yes）
+        pkg_spec = _localize._extract_pkg_spec(list(args))
+        if not pkg_spec:
+            continue
+        candidates[name] = pkg_spec
+
+    if not candidates:
+        if mode == 'interactive':
+            print('[INFO] 当前所选集合中没有需要本地化的 npx 服务，跳过 localize')
+        return
+
+    selected_names: list[str]
+
+    if mode == 'all':
+        selected_names = list(candidates.keys())
+    else:
+        # 交互式选择要本地化的服务
+        print('\n检测到以下 MCP 服务器可通过本地安装加速（npx → 本地二进制）：')
+        items = list(candidates.items())
+        for idx, (name, pkg) in enumerate(items, start=1):
+            print(f'  {idx}) {name}  ({pkg})')
+        print('选择要本地化的编号（空格分隔；留空=全部跳过；输入 0 = 全部本地化）：')
+        picks = input('输入编号列表: ').strip().split()
+        if not picks:
+            print('[INFO] 已跳过本地化，本次仍通过 npx 启动这些服务')
+            return
+        if any(p == '0' for p in picks):
+            selected_names = [name for name, _ in items]
+        else:
+            selected_names = []
+            for p in picks:
+                if p.isdigit():
+                    i = int(p)
+                    if 1 <= i <= len(items):
+                        name = items[i-1][0]
+                        if name not in selected_names:
+                            selected_names.append(name)
+        if not selected_names:
+            print('[INFO] 未选择任何服务，本地化已跳过')
+            return
+
+    changed = False
+    for name in selected_names:
+        pkg_spec = candidates.get(name)
+        if not pkg_spec:
+            continue
+        print(f"[INFO] 正在为 {name} 执行本地安装（{pkg_spec}）...")
+        path = _localize._install_npm(name, pkg_spec, force=False, upgrade=False)
+        if path:
+            resolved[name] = path
+            changed = True
+
+    if changed:
+        _save_local_resolved(resolved)
+        if mode == 'interactive':
+            print('[OK] 已更新本地化映射，后续 run 将优先使用本地二进制')
+def _load_local_resolved() -> dict:
+    path = U.HOME / '.mcp-local' / 'resolved.json'
+    return U.load_json(path, {}, "读取本地化记录")
+
+
+def _save_local_resolved(obj: dict) -> None:
+    path = U.HOME / '.mcp-local' / 'resolved.json'
+    U.save_json(path, obj)
+
+
+def _strip_npx_args(cmd: str, args: list[str]) -> list[str]:
+    """从 npx 参数中剥离 `-y/--yes` 与包名，仅保留真正传给 CLI 的参数。"""
+    if cmd != 'npx' or not args:
+        return list(args or [])
+    i = 0
+    # 跳过 -y/--yes
+    while i < len(args) and args[i] in ('-y', '--yes'):
+        i += 1
+    # 跳过包名（pkg / scope/pkg / pkg@ver / @scope/pkg@ver）
+    if i < len(args):
+        i += 1
+    return list(args[i:])
+
+
+def _apply_local_override(subset: dict) -> dict:
+    """若存在本地化记录，优先使用本地路径；失败回退原值。"""
+    resolved = _load_local_resolved()
+    if not resolved:
+        return subset
+    out = {}
+    for name, info in subset.items():
+        path = resolved.get(name)
+        if path:
+            p = Path(path)
+            if p.is_absolute() and p.exists() and os.access(p, os.X_OK):
+                new_info = dict(info)
+                orig_cmd = (info or {}).get('command') or ''
+                orig_args = list((info or {}).get('args') or [])
+                new_info['command'] = path
+                # 对 npx 迁移：去掉 npx 自身参数与包名，仅保留真正 CLI 参数
+                new_info['args'] = _strip_npx_args(orig_cmd, orig_args)
+                out[name] = new_info
+                continue
+        out[name] = info
+    return out
+
+
+def _ensure_command_exists(name: str, info: dict) -> bool:
+    cmd = (info or {}).get('command')
+    if not cmd:
+        return False
+    p = Path(cmd)
+    if p.is_absolute():
+        return p.exists() and os.access(p, os.X_OK)
+    return shutil.which(cmd) is not None
+
+
+def _fallback_to_original(subset: dict, original: dict) -> dict:
+    """若当前 command 不可执行，回退到原始定义（通常为 npx），并输出提示。"""
+    fixed = {}
+    for name, info in subset.items():
+        if _ensure_command_exists(name, info):
+            fixed[name] = info
+            continue
+        orig = original.get(name)
+        if orig and _ensure_command_exists(name, orig):
+            print(f"[WARN] {name}: 本地/当前命令不可用，已回退到中央清单定义")
+            fixed[name] = orig
+        else:
+            fixed[name] = info  # 保持原值，后续落地可能失败但保持透明
+            print(f"[WARN] {name}: 找不到可用命令，请检查 npx/本地路径或重新 localize")
+    return fixed
 
 
 def _expand_tilde(v: object) -> object:
@@ -144,10 +302,8 @@ def apply_claude(subset: dict, verbose: bool=False, dry_run: bool=False) -> int:
         print('[DRY-RUN] 将对齐 Claude 注册表（预览）')
         print('  keys:', ', '.join(want) if want else '(none)')
         # 展示 add/remove 预览
-        obj,_ = U.load_central_servers()
-        servers = obj.get('servers') or {}
         for n in want:
-            info = servers.get(n) or {}
+            info = subset.get(n) or {}
             cmd = ['claude','mcp','add','--transport','stdio', n]
             for k,v in (info.get('env') or {}).items():
                 cmd += ['-e', f'{k}={v}']
@@ -156,7 +312,7 @@ def apply_claude(subset: dict, verbose: bool=False, dry_run: bool=False) -> int:
             print('[DRY-RUN]', ' '.join(cmd))
         return 0
 
-    # 实际对齐：先 remove 再 add
+    # 实际对齐：先 remove 再 add（全量覆盖，避免残留）
     # 先尝试列出已注册项
     try:
         out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=10)
@@ -167,9 +323,9 @@ def apply_claude(subset: dict, verbose: bool=False, dry_run: bool=False) -> int:
                 present.append(line.split(':',1)[0].strip())
     except Exception:
         present = []
-    # 移除所有 present 中属于 want 的项（稳妥起见）
+    # 移除所有现有注册项，确保只保留 want
     remove_ok=[]; remove_fail=[]
-    for n in sorted(set(present) & set(want)):
+    for n in sorted(set(present)):
         try:
             cmd_rm = ['claude','mcp','remove',n]
             if verbose:
@@ -178,12 +334,10 @@ def apply_claude(subset: dict, verbose: bool=False, dry_run: bool=False) -> int:
             (remove_ok if r.returncode==0 else remove_fail).append(n)
         except Exception:
             remove_fail.append(n)
-    # 再按中央清单重加
-    obj,_ = U.load_central_servers()
-    servers = obj.get('servers') or {}
+    # 再按当前 subset 重加（包含本地化覆盖后的 command/args）
     add_ok=[]; add_fail=[]
     for n in want:
-        info = servers.get(n) or {}
+        info = subset.get(n) or {}
         try:
             subprocess.run(['claude','mcp','remove', n], check=False, timeout=10)
         except Exception:
@@ -337,6 +491,18 @@ def run(args) -> int:
         print('[DBG] client', client, file=os.sys.stderr)
 
     # 非交互模式的预览与确认
+    # 根据参数选择是否在 run 流程中执行一次本地化（可实现“边选边本地化”的混合配置）
+    localize_mode = 'off'
+    if getattr(args, 'localize', False) and not dry_run:
+        # 预选模式下走“全部本地化”（避免额外交互）；纯交互模式则提供列表选择
+        localize_mode = 'all' if preselected else 'interactive'
+    _localize_on_run(subset, localize_mode)
+
+    # 尝试应用本地化覆盖，再按需回退到中央清单定义
+    original_subset = subset
+    subset = _apply_local_override(subset)
+    subset = _fallback_to_original(subset, original_subset)
+
     if (preselected or dry_run) and client and subset:
         _preview(client, subset, dry_run)
         if preselected and not dry_run and not getattr(args, 'yes', False):

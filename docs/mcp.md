@@ -44,10 +44,35 @@ mcp check
     - claude(= claude-file)、claude-reg、codex、gemini、iflow、droid、cursor、vscode(=vscode-user)、vscode-insiders
   - --central 可选显示中央清单（通常不需要）。
 
-（已收敛）不再提供参数式配置命令，全部改为交互模式：
+交互优先，同时保留少量参数式用法，方便脚本与自动化：
 
-- run（交互式）
-  - 运行 `mcp run` 后，依提示选择客户端与服务集合；可选输入启动命令；直接回车仅落地不启动。
+- run（交互 / 非交互）
+  - 交互模式：直接运行 `mcp run`，依提示选择客户端与服务集合；可选输入启动命令；直接回车仅落地不启动。
+  - 非交互示例：
+    - `mcp run --client cursor --preset cursor-minimal --yes`：为 Cursor 直接下发预设场景包。
+    - `mcp run --client codex --servers filesystem,task-master-ai --dry-run`：仅预览将要写入 Codex 的差异。
+  - 关键参数：
+    - `--client`：预选客户端（cursor / codex / claude / vscode...），跳过交互选择步骤。
+    - `--servers`：预选服务列表（逗号分隔），如 `--servers filesystem,task-master-ai`。
+    - `--preset`：预选场景包名称（与交互菜单一致，如 `cursor-minimal` / `claude-basic`）。
+    - `--yes`：非交互模式自动确认写入（配合 `--client`/`--servers`/`--preset` 使用）。
+    - `--dry-run`：仅预览差异，不写入任何客户端配置。
+    - `--localize`：在本次 run 中，为当前选择的 npx 服务执行本地安装并写入 `~/.mcp-local/resolved.json`，使其后续优先使用本地二进制。
+
+- clear（交互 / 非交互）
+  - 清理指定或全部客户端 MCP 配置（含 Claude 注册表）；支持 `--client` 多选、`--dry-run` 预览、`--yes` 自动确认。
+  - 关键点：
+    - 未带 `--client` 时：交互选择要清理的客户端（空行=全部）。
+    - 带 `--client` 时：只针对指定客户端清理；如提供了未知客户端名称，会报错并不做任何修改（不会“退回到全部清理”）。
+    - 单槽备份 `.backup`，可用 `mcp undo` 回滚。
+
+- localize
+  - 将中央清单中使用 `npx` 启动的服务本地安装到 `~/.mcp-local/npm/<name>/...`，并在 `~/.mcp-local/resolved.json` 中记录“服务名 → 本地二进制路径”的映射。
+  - 关键参数：
+    - `--upgrade`：强制升级本地版本到最新（`@latest`），适合想要保持始终最新版的场景。
+    - `--force`：无视已有安装记录，强制重装。
+    - `--prune`：清理本地镜像目录 `~/.mcp-local`，不执行安装。
+  - 说明：`mcp run --localize` 只针对“当前选择的服务”做一次性本地化；`mcp localize` 则是对 central 中所有 npx 服务做批量预热/升级。
 
 ## 注意事项
 
@@ -56,7 +81,7 @@ mcp check
 - IDE 专用文件：
   - VS Code：CLI 会按平台自动定位（macOS 使用 `~/Library/Application Support/...`，Linux 使用 `~/.config/...`）
   - Cursor：~/.cursor/mcp.json
-- 文件备份：所有改写会生成单槽 `.backup` 覆盖，配合 `mcp undo` 可回滚。
+- 文件备份：所有改写会生成单槽 `.backup` 覆盖，配合 `mcp undo` 可回滚；clear 同样使用单槽备份。
 - 体检：`mcp check` 为轻量只读体检；如需连通性等深度体检，请运行 `scripts/mcp-check.sh`。
 - 中央清单建议：Node 生态服务显式写 `npx -y <package>@latest`，保持最新；如需稳定，可对单个服务改为固定版本（`@x.y.z`）。
 - 成本建议：为降低 Token 消耗，建议 CLI（codex/claude/gemini/iflow/droid）按需落地甚至默认不落地；IDE 仅启用必要 MCP（如 `task-master-ai`、`context7`）。

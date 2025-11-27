@@ -561,18 +561,14 @@ def run(args) -> int:
 
     cmd = getattr(args, "central_cmd", None)
     if cmd is None:
-        # 顶层交互菜单
+        # 简化交互菜单（新手模式）：列出、模板、校验/体检，其他用简短入口
         while True:
-            print('\nCentral 管理（交互模式）:')
+            print('\nCentral 管理（简化交互）:')
             print('  1) 列表/查看')
-            print('  2) 新增')
-            print('  3) 更新')
-            print('  4) 删除')
-            print('  5) 启用/禁用')
-            print('  6) 模板创建')
-            print('  7) 导入/导出')
-            print('  8) 校验')
-            print('  9) 体检')
+            print('  2) 新增/更新/启用/禁用')
+            print('  3) 模板创建')
+            print('  4) 导入/导出')
+            print('  5) 校验/体检')
             print('  0) 退出')
             sel = input('选择: ').strip() or '0'
             if sel == '0':
@@ -583,30 +579,28 @@ def run(args) -> int:
                 if n:
                     _cmd_show(type('o',(object,),{'name':n,'json':False}))
             elif sel == '2':
-                run(type('args',(object,),{'central_cmd':'add','interactive':True,'json':False}))
-            elif sel == '3':
-                run(type('args',(object,),{'central_cmd':'update','interactive':True,'json':False}))
-            elif sel == '4':
-                run(type('args',(object,),{'central_cmd':'remove','interactive':True,'json':False}))
-            elif sel == '5':
-                name = _choose_server('选择服务');
-                if not name: continue
-                mode = input('启用(e) / 禁用(d): ').strip().lower()
-                if mode.startswith('e'):
+                name = _choose_server('选择服务 (或 0 新建)', allow_new=True)
+                if not name:
+                    continue
+                op = input('操作: [u]pdate/[e]nable/[d]isable/[r]emove (回车=update): ').strip().lower() or 'u'
+                if op.startswith('e'):
                     _cmd_toggle(type('o',(object,),{'name':name,'json':False}), True)
-                elif mode.startswith('d'):
+                elif op.startswith('d'):
                     _cmd_toggle(type('o',(object,),{'name':name,'json':False}), False)
-            elif sel == '6':
+                elif op.startswith('r'):
+                    _cmd_remove(type('o',(object,),{'name':name,'json':False}))
+                else:
+                    run(type('args',(object,),{'central_cmd':'update','interactive':True,'json':False,'name':name}))
+            elif sel == '3':
                 run(type('args',(object,),{'central_cmd':'template','interactive':True,'json':False}))
-            elif sel == '7':
+            elif sel == '4':
                 io = input('导入(i) / 导出(o): ').strip().lower()
                 if io.startswith('i'):
                     run(type('args',(object,),{'central_cmd':'import','interactive':True,'json':False}))
                 else:
                     run(type('args',(object,),{'central_cmd':'export','interactive':True,'json':False}))
-            elif sel == '8':
+            elif sel == '5':
                 _cmd_validate(type('o',(object,),{'json':False}))
-            elif sel == '9':
                 _cmd_doctor(type('o',(object,),{'json':False}))
             else:
                 print('无效选择')

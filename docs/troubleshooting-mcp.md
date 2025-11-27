@@ -67,6 +67,10 @@
 ### 1) Claude（文件为主 + 注册表兜底）
 - 文件：`~/.claude/settings.json` 顶层 `mcpServers`（推荐主来源）。
 - 注册表：`claude mcp add/remove` 会写入内部“注册表”，`/mcp` 会合并显示它与文件配置。
+- 使用 `mcp run` 为 Claude 下发服务时：
+  - 文件端以当前中央清单为基准生成 `mcpServers`；
+  - 注册表端会“先 remove 再 add”，确保与这次选择的服务集合一致；
+  - 若对应服务已通过 `mcp localize` 或 `mcp run --localize` 本地化，则优先使用本地二进制路径及其参数，否则回退到中央清单中的 `command/args`（通常是 `npx -y <pkg>@latest`；`serena` 始终使用本地二进制）。
 - 清理重复与历史别名（支持作用域）：
   - 移除：`claude mcp remove <name> -s local`、`-s user`（或不加 `-s` 逐级尝试）。
 - 注册写法（务必注意 `-e ... --` 顺序）：
@@ -133,7 +137,10 @@ npx -y @playwright/mcp@latest \
 - 启动前只加载少量 MCP：运行 `mcp run`，在交互中仅勾选需要的服务；如需启动，在最后一步输入启动命令；直接回车仅落地不启动。
 
 提示（dry-run 预览变更）：
-- 预览与确认：已内置在交互步骤中，无需 `-n/--dry-run` 参数。
+- 交互模式：在 `mcp run` / `mcp clear` 的交互步骤中，会先显示变更摘要再确认写入。
+- 非交互/脚本模式：可使用子命令级的 `--dry-run` 参数进行预览，例如：
+  - `mcp run --client claude --preset claude-basic --dry-run`
+  - `mcp clear --client claude --dry-run`
   示例：运行 `mcp run` → 选择 `claude` → 勾选 `context7, serena` → 确认写入 → 需要时输入 `claude` 启动。
 
 ---
