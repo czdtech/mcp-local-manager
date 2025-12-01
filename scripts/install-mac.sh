@@ -110,6 +110,11 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
       "env": {
         "TASK_MASTER_TOOLS": "standard"
       }
+    },
+    "寸止": {
+      "enabled": true,
+      "type": "local",
+      "command": "寸止"
     }
   }
 }

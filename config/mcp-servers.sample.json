@@ -58,6 +58,11 @@
       "env": {
         "TASK_MASTER_TOOLS": "standard"
       }
+    },
+    "寸止": {
+      "enabled": true,
+      "type": "local",
+      "command": "寸止"
     }
   }
 }

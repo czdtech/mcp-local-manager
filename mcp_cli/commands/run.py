@@ -17,6 +17,10 @@ PRESET_PACKS = {
         "desc": "Cursor 最小包：task-master-ai + context7",
         "servers": ["task-master-ai", "context7"],
     },
+    "cursor-cunzhi": {
+        "desc": "Cursor 专属可选：寸止（代码助手，仅下发寸止 MCP）",
+        "servers": ["寸止"],
+    },
     "claude-basic": {
         "desc": "Claude 文件+注册表：task-master-ai + context7",
         "servers": ["task-master-ai", "context7"],
