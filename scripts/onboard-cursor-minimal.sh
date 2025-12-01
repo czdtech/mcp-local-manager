@@ -110,7 +110,7 @@ if p.exists():
 PY
 # Claude 注册表
 if command -v claude >/dev/null 2>&1; then
-  for n in context7 task-master-ai codex-cli chrome-devtools filesystem playwright sequential-thinking serena; do
+  for n in context7 task-master-ai chrome-devtools filesystem playwright sequential-thinking serena; do
     claude mcp remove "$n" -s local >/dev/null 2>&1 || true
     claude mcp remove "$n" -s user  >/dev/null 2>&1 || true
     claude mcp remove "$n"          >/dev/null 2>&1 || true

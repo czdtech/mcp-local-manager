@@ -357,7 +357,6 @@ _BUILTIN_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "sequential-thinking": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"]},
     "playwright": {"command": "npx", "args": ["-y", "@playwright/mcp@latest", "--headless"]},
     "serena": {"command": "~/.local/bin/serena", "args": ["start-mcp-server", "--context", "desktop-app"]},
-    "codex-cli": {"command": "npx", "args": ["-y", "@cexll/codex-mcp-server@latest"]},
     "context7": {"command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"]},
     "task-master-ai": {
         "command": "npx",

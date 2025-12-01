@@ -51,7 +51,6 @@ package "MCP Servers (本机)" {
   rectangle "playwright\ncommand: npx\nargs: -y @playwright/mcp@latest" as PW
   rectangle "filesystem\ncommand: npx\nargs: -y mcp-server-filesystem@latest" as FS
   rectangle "sequential-thinking\ncommand: npx\nargs: -y @modelcontextprotocol/server-sequential-thinking@latest" as ST
-  rectangle "codex-cli\ncommand: npx\nargs: -y @cexll/codex-mcp-server@latest" as CMC
   rectangle "context7\ncommand: npx\nargs: -y @upstash/context7-mcp@latest" as CTX7
   rectangle "task-master-ai\ncommand: npx\nargs: -y task-master-ai@latest" as TMA
   rectangle "serena\n~/.local/bin/serena start-mcp-server" as SERENA
@@ -61,7 +60,6 @@ RUNTIME -down-> CDT
 RUNTIME -down-> PW
 RUNTIME -down-> FS
 RUNTIME -down-> ST
-RUNTIME -down-> CMC
   RUNTIME -down-> CTX7
   RUNTIME -down-> TMA
   RUNTIME -down-> SERENA

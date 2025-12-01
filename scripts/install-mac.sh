@@ -89,12 +89,6 @@ cat > "$MCP_CENTRAL_DIR/mcp-servers.json" <<JSON
       "command": "npx",
       "args": ["-y","mcp-server-filesystem@latest","${HOME}/work","${HOME}/.mcp-central"]
     },
-    "codex-cli": {
-      "enabled": true,
-      "type": "local",
-      "command": "npx",
-      "args": ["-y","@cexll/codex-mcp-server@latest"]
-    },
     "context7": {
       "enabled": true,
       "type": "local",

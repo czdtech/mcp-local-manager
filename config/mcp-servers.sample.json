@@ -37,12 +37,6 @@
       "command": "npx",
       "args": ["-y","mcp-server-filesystem@latest","~/work","~/.mcp-central"]
     },
-    "codex-cli": {
-      "enabled": true,
-      "type": "local",
-      "command": "npx",
-      "args": ["-y","@cexll/codex-mcp-server@latest"]
-    },
     "context7": {
       "enabled": true,
       "type": "local",

@@ -34,7 +34,6 @@
   - 统一采用显式最新版：优先 `npx -y <package>@latest`，便于持续获取更新。
   - 避免 wrappers（如 `~/.mcp/bin/*`），优先官方包或本地二进制。
   - 本项目基线（可按需微调）：
-    - `codex-cli`：`npx -y @cexll/codex-mcp-server@latest`
     - `chrome-devtools`：`npx -y chrome-devtools-mcp@latest`
     - `context7`：`npx -y @upstash/context7-mcp@latest`
     - `filesystem`：`npx -y mcp-server-filesystem@latest`
@@ -166,17 +165,10 @@ npx -y @playwright/mcp@latest \
 
 4) 命名与版本一致性
 - 统一命名（小写-连字符）；Chrome DevTools 推荐使用 npx 或安装最新版 `npm i -g chrome-devtools-mcp@latest`
-- Codex MCP 仅保留一个：`codex-cli => npx -y @cexll/codex-mcp-server`
 
 ---
 
 ## 七、命令速查（示例）
-
-- Claude（注册；一般无需传 PATH）
-```bash
-claude mcp add --transport stdio codex-cli -- npx -y @cexll/codex-mcp-server
-claude mcp remove codex-cli -s local  # 作用域示例
-```
 
 - Droid（注册）
 ```bash
@@ -203,7 +195,7 @@ droid mcp add playwright "npx -y @playwright/mcp@latest --headless --no-sandbox 
 本仓库在一次“旧版 → 最新版”的现场升级过程中，暴露出若干典型问题，已在脚本与 CLI 中修复或形成标准操作。记录如下，便于新人“一次成功”。
 
 - Claude 项目级覆盖导致“清不干净”
-  - 现象：`mcp status` 显示 `Claude(register)` 仍有某项（如 `codex-cli`），`claude mcp list` 也显示 Connected；但已清空 `~/.claude/settings.json` 与注册表。
+- 现象：`mcp status` 显示 `Claude(register)` 仍有某项（如 `filesystem`），`claude mcp list` 也显示 Connected；但已清空 `~/.claude/settings.json` 与注册表。
   - 根因：`~/.claude.json` 内 `projects.*.mcpServers` 会覆盖/合并显示注册表与文件端。
   - 处置：清空 `~/.claude.json` 中所有 `projects.*.mcpServers`；已将此步骤自动化到 `scripts/onboard-cursor-minimal.sh`，并增强 `mcp` 的注册表读取稳健性（延长超时、合并 stdout+stderr）。
 
