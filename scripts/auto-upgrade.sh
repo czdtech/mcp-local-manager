@@ -17,29 +17,41 @@ UPGRADE_ID="upgrade-$(date +%Y%m%d_%H%M%S)"
 # 升级开始时间
 START_TIME=$(date +%s)
 
-# 日志函数（增强版）
+# 颜色输出
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# 日志函数（增强版，带颜色 + 文件落地）
 log_info() {
     local message="$1"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$timestamp] [INFO] $message" | tee -a "$LOG_FILE"
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    # 同时输出到终端（带颜色）和日志文件（去色）
+    echo -e "${BLUE}[$timestamp] [INFO]${NC} $message" | tee -a "$LOG_FILE"
 }
 
 log_success() {
     local message="$1"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "\033[0;32m[$timestamp] [SUCCESS]\033[0m $message" | tee -a "$LOG_FILE"
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[$timestamp] [SUCCESS]${NC} $message" | tee -a "$LOG_FILE"
 }
 
 log_warning() {
     local message="$1"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "\033[1;33m[$timestamp] [WARNING]\033[0m $message" | tee -a "$LOG_FILE"
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${YELLOW}[$timestamp] [WARNING]${NC} $message" | tee -a "$LOG_FILE"
 }
 
 log_error() {
     local message="$1"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "\033[0;31m[$timestamp] [ERROR]\033[0m $message" | tee -a "$LOG_FILE"
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${RED}[$timestamp] [ERROR]${NC} $message" | tee -a "$LOG_FILE"
 }
 
 # 获取锁（防止并发执行）
@@ -167,47 +179,27 @@ precheck_environment() {
         return 1
     fi
     
-    log_info "环境预检查通过"
-    return 0
-}
+	    log_info "环境预检查通过"
+	    return 0
+	}
 
-# 颜色输出
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
 
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# 检测当前安装的MCP
-detect_current_mcp() {
-    log_info "🔍 检测当前MCP安装..."
-    
-    if [ -L "$MCP_BIN_PATH" ]; then
-        local current_target=$(readlink -f "$MCP_BIN_PATH" 2>/dev/null || echo "")
-        if [[ "$current_target" == *"/mcp-local-manager/"* ]]; then
-            log_info "发现当前版本指向: $current_target"
-            if [[ "$current_target" == "$PROJECT_ROOT/bin/mcp" ]]; then
-                log_success "已经是最新版本，无需升级"
-                return 1
-            else
-                log_info "发现旧版本，路径: $current_target"
-                echo "$current_target"
+	# 检测当前安装的MCP
+	detect_current_mcp() {
+	    log_info "🔍 检测当前MCP安装..."
+	    
+	    if [ -L "$MCP_BIN_PATH" ]; then
+	        local current_target
+	        current_target=$(readlink -f "$MCP_BIN_PATH" 2>/dev/null || echo "")
+	        if [[ -n "$current_target" && "$current_target" == *"/mcp-local-manager/"* ]]; then
+	            log_info "发现当前版本指向: $current_target"
+	            # 使用 -ef 比较实际指向的文件是否与当前项目的 mcp 一致（避免大小写路径差异）
+	            if [ "$MCP_BIN_PATH" -ef "$PROJECT_ROOT/bin/mcp" ]; then
+	                log_success "已经是最新版本，无需升级"
+	                return 1
+	            else
+	                log_info "发现旧版本，路径: $current_target"
+	                echo "$current_target"
                 return 0
             fi
         fi
@@ -261,8 +253,28 @@ backup_configurations() {
         log_info "已备份旧版本MCP: $MCP_BIN_PATH"
     fi
     
-    log_success "备份完成: $BACKUP_DIR"
-}
+	    log_success "备份完成: $BACKUP_DIR"
+	}
+	
+	# 清理历史备份目录，只保留最近 BACKUP_RETENTION 个
+	cleanup_backup_directories() {
+	    local root_dir
+	    root_dir="$(dirname "$BACKUP_DIR")"
+	    [[ -d "$root_dir" ]] || return 0
+	    
+	    local backups=()
+	    if compgen -G "$root_dir"/* > /dev/null 2>&1; then
+	        # 按修改时间倒序排序，最新的在前
+	        backups=($(ls -1dt "$root_dir"/* 2>/dev/null))
+	    fi
+	    
+	    if [[ ${#backups[@]} -gt $BACKUP_RETENTION ]]; then
+	        for ((i=BACKUP_RETENTION; i<${#backups[@]}; i++)); do
+	            rm -rf "${backups[i]}"
+	            log_info "清理过期备份目录: ${backups[i]}"
+	        done
+	    fi
+	}
 
 # 清理旧版本
 cleanup_old_installation() {
@@ -381,11 +393,11 @@ show_upgrade_summary() {
 # 主升级流程
 main() {
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║              MCP Local Manager 自动升级工具                      ║"
-    echo "╚══════════════════════════════════════════════════════════════╝"
-    echo
-    
-    # 检查参数
+	    echo "║              MCP Local Manager 自动升级工具                      ║"
+	    echo "╚══════════════════════════════════════════════════════════════╝"
+	    echo
+	   
+	    # 检查参数
     if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
         echo "用法: $0 [选项]"
         echo
@@ -398,15 +410,19 @@ main() {
         echo "  • 备份重要配置文件"
         echo "  • 清理旧版本安装"
         echo "  • 安装最新版本"
-        echo "  • 验证安装结果"
-        echo
-        exit 0
-    fi
-    
-    local force_upgrade=false
-    if [[ "${1:-}" == "--force" ]]; then
-        force_upgrade=true
-    fi
+	        echo "  • 验证安装结果"
+	        echo
+	        exit 0
+	    fi
+	    
+	    # 加锁 + 环境预检查
+	    get_lock
+	    precheck_environment
+	    
+	    local force_upgrade=false
+	    if [[ "${1:-}" == "--force" ]]; then
+	        force_upgrade=true
+	    fi
     
     # 检测当前版本
     local old_path=""
@@ -417,12 +433,13 @@ main() {
         else
             log_info "强制升级模式，继续执行..."
         fi
-    fi
-    
-    # 执行升级流程
-    backup_configurations
-    cleanup_old_installation
-    install_new_version
+	    fi
+	    
+	    # 执行升级流程
+	    backup_configurations
+	    cleanup_backup_directories
+	    cleanup_old_installation
+	    install_new_version
     
     # 验证安装
     if verify_installation; then

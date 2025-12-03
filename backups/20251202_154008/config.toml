@@ -1,0 +1,59 @@
+disable_response_storage = true
+model = "gpt-5.1"
+model_provider = "packycode"
+model_reasoning_effort = "high"
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+
+[features]
+web_search_request = true
+
+[model_providers.packycode]
+base_url = "https://api-slb.packyapi.com/v1"
+name = "packycode"
+wire_api = "responses"
+requires_openai_auth = true
+
+[projects."/Users/jiang"]
+trust_level = "trusted"
+
+[projects."/Users/jiang/.codex"]
+trust_level = "trusted"
+
+[projects."/Users/jiang/Desktop/Aicoding/personal"]
+trust_level = "trusted"
+
+[projects."/Users/jiang/Desktop/me"]
+trust_level = "trusted"
+
+[projects."/Users/jiang/Desktop/Aicoding/nextjs"]
+trust_level = "trusted"
+
+[projects."/Users/jiang/Desktop/mcp-local-manager"]
+trust_level = "trusted"
+
+[notice]
+hide_rate_limit_model_nudge = true
+
+[mcp_servers.chrome-devtools]
+type = "stdio"
+command = "/Users/jiang/.mcp-local/npm/chrome-devtools/node_modules/.bin/chrome-devtools-mcp"
+startup_timeout_sec = 60
+
+[mcp_servers.chrome-devtools.env]
+CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX = "1"
+CHROME_DEVTOOLS_MCP_EXTRA_ARGS = "--disable-dev-shm-usage --disable-gpu"
+
+[mcp_servers.context7]
+type = "stdio"
+command = "/Users/jiang/.mcp-local/npm/context7/node_modules/.bin/context7-mcp"
+startup_timeout_sec = 60
+
+[mcp_servers.serena]
+type = "stdio"
+command = "/usr/local/bin/serena"
+args = ["start-mcp-server", "--context", "desktop-app", "--enable-web-dashboard", "false", "--enable-gui-log-window", "false"]
+startup_timeout_sec = 60
+
+# Common Codex config
+# Add your common TOML configuration here

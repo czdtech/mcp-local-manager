@@ -83,7 +83,7 @@ bash scripts/auto-upgrade.sh --force
 
 ## 🔍 **验证测试结果**
 
-### **快速升级测试** ✅
+### **快速升级测试** ✅（当前行为示例）
 ```
 ╔══════════════════════════════════════════════════════════════╗
 ║              MCP Local Manager 快速升级工具（生产级）              ║
@@ -92,7 +92,7 @@ bash scripts/auto-upgrade.sh --force
 [2025-11-10 16:52:00] [INFO] 开始快速升级流程...
 [2025-11-10 16:52:00] [INFO] 执行环境预检查...
 [2025-11-10 16:52:00] [INFO] 环境预检查通过
-[2025-11-10 16:52:00] [INFO] 已创建备份: /usr/local/bin/mcp.backup.20251110_165200
+[2025-11-10 16:52:00] [INFO] 已创建备份: /tmp/mcp-backups/mcp.backup.20251110_165200
 [2025-11-10 16:52:00] [INFO] 执行原子级版本切换...
 [2025-11-10 16:52:00] [SUCCESS] 符号链接更新成功
 [2025-11-10 16:52:00] [INFO] 权限设置完成
@@ -168,12 +168,21 @@ health_check() {
 BACKUP_RETENTION=5  # 快速升级: 保留5个备份
 BACKUP_RETENTION=3  # 完整升级: 保留3个备份
 
-# 自动清理过期备份
+# 快速升级：在 /tmp/mcp-backups 中自动清理过期备份
 cleanup_backups() {
-    local backups=($(ls -t "$MCP_BIN_PATH".backup.* 2>/dev/null))
+    local backups=()
+    if compgen -G "$BACKUP_DIR/mcp.backup.*" > /dev/null 2>&1; then
+        backups=($(ls -t "$BACKUP_DIR"/mcp.backup.* 2>/dev/null))
+    fi
     if [[ ${#backups[@]} -gt $BACKUP_RETENTION ]]; then
         # 清理超过保留数量的备份
     fi
+}
+
+# 完整升级：在项目 backups/ 目录中按时间清理旧备份目录
+cleanup_backup_directories() {
+    local root_dir="$(dirname "$BACKUP_DIR")"
+    # ... 仅保留最近 BACKUP_RETENTION 个目录
 }
 ```
 

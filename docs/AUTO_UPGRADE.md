@@ -61,7 +61,7 @@ bash scripts/auto-upgrade.sh --force
 
 升级过程会自动创建备份：
 
-- **快速升级备份**：`/usr/local/bin/mcp.backup.YYYYMMDD_HHMMSS`
+- **快速升级备份**：`/tmp/mcp-backups/mcp.backup.YYYYMMDD_HHMMSS`
 - **完整升级备份**：`项目目录/backups/YYYYMMDD_HHMMSS/`
 
 ### 备份内容
@@ -146,8 +146,9 @@ ls -la /usr/local/bin/mcp
 ln -sf /path/to/mcp-local-manager/bin/mcp /usr/local/bin/mcp
 chmod +x /usr/local/bin/mcp
 
-# 恢复备份
-cp /usr/local/bin/mcp.backup.* /usr/local/bin/mcp
+# 恢复快速升级备份
+cp /tmp/mcp-backups/mcp.backup.* /usr/local/bin/mcp
+chmod +x /usr/local/bin/mcp
 ```
 
 ### 验证安装
@@ -167,10 +168,10 @@ bash scripts/mcp-check.sh --probe
 ### 清理问题
 
 ```bash
-# 清理过期的备份文件
-find /usr/local/bin -name "mcp.backup.*" -mtime +30 -delete
+# 清理快速升级产生的过期备份文件
+find /tmp/mcp-backups -name "mcp.backup.*" -mtime +30 -delete
 
-# 清理备份目录
+# 如需手动清理完整升级产生的备份目录（脚本默认保留最近3个）
 rm -rf backups/
 ```
 

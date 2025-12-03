@@ -93,9 +93,13 @@ precheck() {
 rollback_quick() {
     log "INFO" "执行快速回滚..."
     
-    # 恢复最近的备份
-    local latest_backup=$(ls -t "$MCP_BIN_PATH".backup.* 2>/dev/null | head -1)
-    if [[ -n "$latest_backup" ]]; then
+    # 恢复最近的备份（从备份目录中查找）
+    local latest_backup=""
+    if compgen -G "$BACKUP_DIR/mcp.backup.*" > /dev/null 2>&1; then
+        latest_backup=$(ls -t "$BACKUP_DIR"/mcp.backup.* 2>/dev/null | head -1 || true)
+    fi
+
+    if [[ -n "$latest_backup" && -f "$latest_backup" ]]; then
         cp "$latest_backup" "$MCP_BIN_PATH"
         chmod +x "$MCP_BIN_PATH"
         log "SUCCESS" "已回滚到备份版本: $latest_backup"
@@ -129,7 +133,11 @@ health_check() {
 
 # 清理过期备份
 cleanup_backups() {
-    local backups=($(ls -t "$MCP_BIN_PATH".backup.* 2>/dev/null))
+    local backups=()
+    if compgen -G "$BACKUP_DIR/mcp.backup.*" > /dev/null 2>&1; then
+        backups=($(ls -t "$BACKUP_DIR"/mcp.backup.* 2>/dev/null))
+    fi
+
     if [[ ${#backups[@]} -gt $BACKUP_RETENTION ]]; then
         for ((i=BACKUP_RETENTION; i<${#backups[@]}; i++)); do
             rm -f "${backups[i]}"
@@ -157,11 +165,9 @@ quick_upgrade() {
     
     # 备份现有版本
     if [[ -f "$MCP_BIN_PATH" ]]; then
-        local backup_file="$MCP_BIN_PATH.backup.$(date +%Y%m%d_%H%M%S)"
+        local backup_file="$BACKUP_DIR/mcp.backup.$(date +%Y%m%d_%H%M%S)"
         cp "$MCP_BIN_PATH" "$backup_file"
         log "INFO" "已创建备份: $backup_file"
-        # 移动到备份目录以便管理
-        mv "$backup_file" "$BACKUP_DIR/"
     fi
     
     # 原子级链接切换（使用 ln -sfn 更安全）
