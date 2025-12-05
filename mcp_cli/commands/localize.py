@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-from __future__ import annotations
-
 """将中央清单中的 npx/uv 服务本地化，加速启动；落地时优先使用本地路径。"""
+
+from __future__ import annotations
 
 import json
 import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Dict, Any
 
 from .. import utils as U
 
@@ -16,13 +15,18 @@ LOCAL_ROOT = Path.home() / '.mcp-local'
 RESOLVED = LOCAL_ROOT / 'resolved.json'
 
 
-def _load_resolved() -> Dict[str, str]:
+def _load_resolved() -> dict[str, str]:
     return U.load_json(RESOLVED, {}, "读取本地解析记录")
 
 
-def _save_resolved(obj: Dict[str, str]) -> None:
+def _save_resolved(obj: dict[str, str]) -> None:
     RESOLVED.parent.mkdir(parents=True, exist_ok=True)
     RESOLVED.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+def _pkg_base(pkg_spec: str) -> str:
+    """去掉版本段，保留完整的 scope/pkg 形式。"""
+    return pkg_spec.rsplit('@', 1)[0] if '@' in pkg_spec else pkg_spec
 
 
 def _binary_name(pkg_spec: str) -> str:
@@ -41,6 +45,49 @@ def _binary_name(pkg_spec: str) -> str:
     if '/' in base:
         base = base.split('/')[-1]
     return base
+
+
+def _locate_binary(install_dir: Path, pkg_base: str, pkg_spec: str) -> Path | None:
+    """在已安装目录内查找真实的可执行二进制路径。"""
+    bin_dir = install_dir / 'node_modules' / '.bin'
+    if not bin_dir.exists():
+        return None
+
+    candidates: list[str] = []
+
+    # 优先读取 package.json 的 bin 字段，避免猜测失败（如 @playwright/mcp）。
+    pkg_json = install_dir / 'node_modules' / pkg_base / 'package.json'
+    if pkg_json.exists():
+        try:
+            pkg_meta = json.loads(pkg_json.read_text())
+            bin_field = pkg_meta.get('bin')
+            if isinstance(bin_field, str):
+                # npm 对 string 形式的 bin 会使用包名（去 scope）作为二进制名
+                candidates.append(_binary_name(pkg_spec))
+            elif isinstance(bin_field, dict):
+                # dict 形式的 key 就是真实的可执行名
+                candidates.extend(list(bin_field.keys()))
+        except Exception:
+            pass
+
+    # 保持与历史逻辑一致的猜测项
+    candidates.append(_binary_name(pkg_spec))
+
+    seen: set[str] = set()
+    for name in candidates:
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        cand = bin_dir / name
+        if cand.exists() and os.access(cand, os.X_OK):
+            return cand
+
+    # 兜底：返回 .bin 下的第一个可执行文件，避免空手而归
+    for cand in sorted(bin_dir.iterdir()):
+        if cand.is_file() and os.access(cand, os.X_OK):
+            return cand
+
+    return None
 
 
 def _extract_pkg_spec(args: list[str]) -> str | None:
@@ -63,32 +110,38 @@ def _extract_pkg_spec(args: list[str]) -> str | None:
 
 def _install_npm(name: str, pkg_spec: str, force: bool, upgrade: bool) -> str | None:
     install_dir = LOCAL_ROOT / 'npm' / name
-    bin_dir = install_dir / 'node_modules' / '.bin'
-    bin_name = _binary_name(pkg_spec)
-    target = bin_dir / bin_name
+    pkg_base = _pkg_base(pkg_spec)
 
-    if target.exists() and os.access(target, os.X_OK) and not force and not upgrade:
-        print(f"[SKIP] {name}: 已存在本地版 {target}")
-        return str(target)
+    # 若已存在有效二进制且无需强制/升级，直接复用
+    if not force and not upgrade:
+        existing = _locate_binary(install_dir, pkg_base, pkg_spec)
+        if existing:
+            print(f"[SKIP] {name}: 已存在本地版 {existing}")
+            return str(existing)
 
     cmd = ['npm', 'install', '--prefix', str(install_dir)]
     if upgrade:
         cmd.append('--force')
     cmd.append(pkg_spec)
 
-    print(f"[INFO] 安装 {name} -> {target}")
+    print(f"[INFO] 安装 {name} -> {install_dir}")
     try:
         subprocess.run(cmd, check=True, text=True, capture_output=True, timeout=180)
     except subprocess.CalledProcessError as e:
         print(f"[ERR] 安装失败 {name}: {e.stderr or e.stdout}")
         return None
-    if not target.exists():
-        # 尝试 fallback：列出 bin_dir
-        if bin_dir.exists():
-            bins = list(bin_dir.iterdir())
-            if bins:
-                target = bins[0]
-    return str(target) if target.exists() and os.access(target, os.X_OK) else None
+
+    target = _locate_binary(install_dir, pkg_base, pkg_spec)
+    if target and target.exists() and os.access(target, os.X_OK):
+        return str(target)
+
+    bin_dir = install_dir / 'node_modules' / '.bin'
+    if bin_dir.exists():
+        bins = ', '.join(p.name for p in sorted(bin_dir.iterdir()))
+        print(f"[ERR] 未找到可执行文件，.bin 内容：{bins}")
+    else:
+        print(f"[ERR] 未找到 .bin 目录：{bin_dir}")
+    return None
 
 
 def _prune():
