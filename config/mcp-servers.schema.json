@@ -69,6 +69,11 @@
             "additionalProperties": {
               "type": "string"
             }
+          },
+          "source": {
+            "type": "string",
+            "description": "Metadata: where this entry came from (e.g., imported:cursor)",
+            "minLength": 1
           }
         },
         "additionalProperties": false

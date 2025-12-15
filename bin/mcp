@@ -6,6 +6,20 @@ from __future__ import annotations
 import argparse, json, os, re, shutil, subprocess, sys, platform
 from pathlib import Path
 
+if sys.version_info < (3, 11):
+    v = sys.version.split()[0]
+    # 尽量自动切到 python3.11+，避免用户/CI 的 `python3` 仍指向旧版本
+    for cand in ("python3.11", "python3.12", "python3.13"):
+        py = shutil.which(cand)
+        if py:
+            os.execv(py, [py, str(Path(__file__).resolve()), *sys.argv[1:]])
+    print(
+        f"❌ 当前 Python {v}，本项目 CLI 需要 Python 3.11+。\n"
+        "   解决：安装 python3.11 并使用 `python3.11 bin/mcp ...`，或让 `python3` 指向 3.11。",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
 ## 确保可导入顶层包（mcp_cli 等）
 _BASE = Path(__file__).resolve().parent.parent
 if str(_BASE) not in sys.path:
@@ -363,30 +377,8 @@ def _clear_claude_registry(verbose: bool=False):
     return 0
 
 def cmd_undo(args):
-    """从 *.backup 恢复；若未提供 dest，尝试基于文件名推断原路径。"""
-    backup_path = Path(args.backup).expanduser()
-    dest = Path(args.dest).expanduser() if getattr(args, 'dest', None) else None
-    if not backup_path.exists():
-        print(f"[ERR] 备份文件不存在: {backup_path}")
-        return 1
-    if dest is None:
-        name = backup_path.name
-        # 先去掉 .backup 尾缀
-        if name.endswith('.backup'):
-            name = name[:-7]
-        # 兼容旧格式：config.json.20251125_143022.backup / config.20251125_143022.backup
-        import re
-        m = re.match(r"^(?P<base>.+)\.(?P<ts>\d{8}_\d{6})$", name)
-        base = m.group('base') if m else name
-        dest = backup_path.with_name(base)
-    try:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(backup_path, dest)
-        print(f"[OK] 已恢复到: {dest}")
-        return 0
-    except Exception as e:
-        print(f"[ERR] 恢复失败: {e}")
-        return 1
+    from mcp_cli.commands import undo as _undo
+    return _undo.run(args)
 
 def cmd_clear(args):
     from mcp_cli.commands import clear as _clear
@@ -396,6 +388,18 @@ def cmd_clear(args):
 def cmd_localize(args):
     from mcp_cli.commands import localize as _loc
     return _loc.run(args)
+
+def cmd_onboard(args):
+    from mcp_cli.commands import onboard as _onboard
+    return _onboard.run(args)
+
+def cmd_doctor(args):
+    from mcp_cli.commands import doctor as _doctor
+    return _doctor.run(args)
+
+def cmd_ui(args):
+    from mcp_cli.commands import ui as _ui
+    return _ui.run(args)
 
 def apply_json_map(label, path: Path, subset: dict, top_key='mcpServers'):
     from mcp_cli.commands.run import apply_json_map as _aj
@@ -416,6 +420,7 @@ def main():
         ),
         epilog=(
             '常用入口:\n'
+            '  - mcp ui       本地 Web UI: 列表 + 开关实时落地（最适合普通用户）\n'
             '  - mcp run      进入交互式向导, 按客户端落地所选 MCP (最后可选启动)\n'
             '  - mcp central  进入交互式向导, 管理中央清单 (CRUD/模板/导入导出/校验/体检)\n'
             '只读命令:\n'
@@ -448,6 +453,28 @@ def main():
     sp_run.add_argument('--localize', action='store_true', help='在本次 run 中为选定 npx 服务执行本地安装并切换为本地二进制')
     sp_run.set_defaults(func=cmd_run)
     # 旧版 central 定义块已移除（统一使用新版 central 定义）
+
+    # onboard：一键上手（北极星路径）
+    sp_on = sub.add_parser('onboard', help='一键上手：选择客户端 + 预设包，一次完成 central 准备 + 下发')
+    sp_on.add_argument('--client', help='目标客户端（cursor/claude/vscode-user/vscode-insiders/codex/...）')
+    sp_on.add_argument('--preset', help='预设场景包名称（默认按 client 推荐）')
+    sp_on.add_argument('--localize', action='store_true', help='下发前对所选 npx 服务执行一次本地化（npm install 到 ~/.mcp-local）')
+    sp_on.add_argument('--yes', action='store_true', help='非交互模式自动确认写入')
+    sp_on.add_argument('--dry-run', action='store_true', help='仅预览差异，不写入')
+    sp_on.set_defaults(func=cmd_onboard)
+
+    # doctor：聚合诊断（central + 目标端漂移）
+    sp_doc = sub.add_parser('doctor', help='聚合诊断：central 健康 + 目标端漂移 + 下一步建议（只读）')
+    sp_doc.add_argument('--client', action='append', help='指定要检查的客户端（可多次提供；claude 会展开为 file+registry）')
+    sp_doc.add_argument('--json', action='store_true', help='JSON 输出（便于脚本/自动化）')
+    sp_doc.add_argument('--verbose', action='store_true', help='输出更多细节')
+    sp_doc.set_defaults(func=cmd_doctor)
+
+    # ui：本地 Web UI（列表+开关实时落地）
+    sp_ui = sub.add_parser('ui', help='本地 Web UI：列表 + 开关实时落地（仅监听 127.0.0.1）')
+    sp_ui.add_argument('--host', default='127.0.0.1', help='监听地址（默认 127.0.0.1）')
+    sp_ui.add_argument('--port', type=int, default=0, help='监听端口（默认 0=系统分配随机空闲端口）')
+    sp_ui.set_defaults(func=cmd_ui)
 
     sub.add_parser('check', help='只读体检').set_defaults(func=cmd_check)
 

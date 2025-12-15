@@ -74,6 +74,38 @@ def test_central_template_and_export_import(tmp_path):
     assert r.returncode == 0
 
 
+def test_central_import_rejects_unknown_server_fields(tmp_path):
+    # 记录导入前 central 内容
+    central = Path.home() / '.mcp-central' / 'config' / 'mcp-servers.json'
+    before = central.read_text(encoding='utf-8')
+
+    bad = tmp_path / 'bad-central.json'
+    bad.write_text(
+        json.dumps(
+            {
+                "version": "1.1.0",
+                "description": "bad config",
+                "servers": {
+                    "bad": {
+                        "command": "npx",
+                        "args": ["-y", "pkg@latest"],
+                        "foo": "bar",  # schema 不允许的字段
+                    }
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding='utf-8',
+    )
+
+    r = run_cmd(['central', 'import', '--file', str(bad)])
+    assert r.returncode == 3
+    # 导入失败不应改写 central
+    after = central.read_text(encoding='utf-8')
+    assert after == before
+
+
 def test_central_validate_and_doctor_json():
     r = run_cmd(['central', 'validate', '--json'])
     assert r.returncode in (0, 1)  # 根据环境可能缺少 jsonschema

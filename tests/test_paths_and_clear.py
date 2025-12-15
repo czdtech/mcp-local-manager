@@ -25,10 +25,13 @@ def test_help_has_run():
 
 
 def test_clear_dry_run_all_linux(tmp_path: Path):
-    env = {
-        'HOME': str(tmp_path),
-        'MCP_OS': 'linux',
-    }
+    env = os.environ.copy()
+    env.update(
+        {
+            'HOME': str(tmp_path),
+            'MCP_OS': 'linux',
+        }
+    )
     r = subprocess.run([BIN, 'clear'], input='\n'+'y\n', text=True, capture_output=True, env=env)
     assert r.returncode == 0
     # 核心路径（Linux）应出现
@@ -37,10 +40,13 @@ def test_clear_dry_run_all_linux(tmp_path: Path):
 
 
 def test_clear_dry_run_all_macos(tmp_path: Path):
-    env = {
-        'HOME': str(tmp_path),
-        'MCP_OS': 'darwin',
-    }
+    env = os.environ.copy()
+    env.update(
+        {
+            'HOME': str(tmp_path),
+            'MCP_OS': 'darwin',
+        }
+    )
     r = subprocess.run([BIN, 'clear'], input='\n'+'y\n', text=True, capture_output=True, env=env)
     assert r.returncode == 0
     # 核心路径（macOS）应出现

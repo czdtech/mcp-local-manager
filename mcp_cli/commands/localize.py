@@ -11,8 +11,8 @@ from pathlib import Path
 
 from .. import utils as U
 
-LOCAL_ROOT = Path.home() / '.mcp-local'
-RESOLVED = LOCAL_ROOT / 'resolved.json'
+LOCAL_ROOT = Path.home() / ".mcp-local"
+RESOLVED = LOCAL_ROOT / "resolved.json"
 
 
 def _load_resolved() -> dict[str, str]:
@@ -21,12 +21,12 @@ def _load_resolved() -> dict[str, str]:
 
 def _save_resolved(obj: dict[str, str]) -> None:
     RESOLVED.parent.mkdir(parents=True, exist_ok=True)
-    RESOLVED.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding='utf-8')
+    RESOLVED.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _pkg_base(pkg_spec: str) -> str:
     """去掉版本段，保留完整的 scope/pkg 形式。"""
-    return pkg_spec.rsplit('@', 1)[0] if '@' in pkg_spec else pkg_spec
+    return pkg_spec.rsplit("@", 1)[0] if "@" in pkg_spec else pkg_spec
 
 
 def _binary_name(pkg_spec: str) -> str:
@@ -41,26 +41,26 @@ def _binary_name(pkg_spec: str) -> str:
       1) 去掉最后一个 @ 之后的版本段；
       2) 若带 scope，仅保留最后一段（pkg）。
     """
-    base = pkg_spec.rsplit('@', 1)[0] if '@' in pkg_spec else pkg_spec
-    if '/' in base:
-        base = base.split('/')[-1]
+    base = pkg_spec.rsplit("@", 1)[0] if "@" in pkg_spec else pkg_spec
+    if "/" in base:
+        base = base.split("/")[-1]
     return base
 
 
 def _locate_binary(install_dir: Path, pkg_base: str, pkg_spec: str) -> Path | None:
     """在已安装目录内查找真实的可执行二进制路径。"""
-    bin_dir = install_dir / 'node_modules' / '.bin'
+    bin_dir = install_dir / "node_modules" / ".bin"
     if not bin_dir.exists():
         return None
 
     candidates: list[str] = []
 
     # 优先读取 package.json 的 bin 字段，避免猜测失败（如 @playwright/mcp）。
-    pkg_json = install_dir / 'node_modules' / pkg_base / 'package.json'
+    pkg_json = install_dir / "node_modules" / pkg_base / "package.json"
     if pkg_json.exists():
         try:
             pkg_meta = json.loads(pkg_json.read_text())
-            bin_field = pkg_meta.get('bin')
+            bin_field = pkg_meta.get("bin")
             if isinstance(bin_field, str):
                 # npm 对 string 形式的 bin 会使用包名（去 scope）作为二进制名
                 candidates.append(_binary_name(pkg_spec))
@@ -101,7 +101,7 @@ def _extract_pkg_spec(args: list[str]) -> str | None:
     if not args:
         return None
     i = 0
-    while i < len(args) and args[i] in ('-y', '--yes'):
+    while i < len(args) and args[i] in ("-y", "--yes"):
         i += 1
     if i >= len(args):
         return None
@@ -109,7 +109,7 @@ def _extract_pkg_spec(args: list[str]) -> str | None:
 
 
 def _install_npm(name: str, pkg_spec: str, force: bool, upgrade: bool) -> str | None:
-    install_dir = LOCAL_ROOT / 'npm' / name
+    install_dir = LOCAL_ROOT / "npm" / name
     pkg_base = _pkg_base(pkg_spec)
 
     # 若已存在有效二进制且无需强制/升级，直接复用
@@ -119,9 +119,9 @@ def _install_npm(name: str, pkg_spec: str, force: bool, upgrade: bool) -> str | 
             print(f"[SKIP] {name}: 已存在本地版 {existing}")
             return str(existing)
 
-    cmd = ['npm', 'install', '--prefix', str(install_dir)]
+    cmd = ["npm", "install", "--prefix", str(install_dir)]
     if upgrade:
-        cmd.append('--force')
+        cmd.append("--force")
     cmd.append(pkg_spec)
 
     print(f"[INFO] 安装 {name} -> {install_dir}")
@@ -135,9 +135,9 @@ def _install_npm(name: str, pkg_spec: str, force: bool, upgrade: bool) -> str | 
     if target and target.exists() and os.access(target, os.X_OK):
         return str(target)
 
-    bin_dir = install_dir / 'node_modules' / '.bin'
+    bin_dir = install_dir / "node_modules" / ".bin"
     if bin_dir.exists():
-        bins = ', '.join(p.name for p in sorted(bin_dir.iterdir()))
+        bins = ", ".join(p.name for p in sorted(bin_dir.iterdir()))
         print(f"[ERR] 未找到可执行文件，.bin 内容：{bins}")
     else:
         print(f"[ERR] 未找到 .bin 目录：{bin_dir}")
@@ -153,16 +153,17 @@ def _prune():
 
 
 def run(args) -> int:
-    if getattr(args, 'prune', False):
+    if getattr(args, "prune", False):
         _prune()
         return 0
 
-    upgrade = bool(getattr(args, 'upgrade', False))
-    force = bool(getattr(args, 'force', False))
+    upgrade = bool(getattr(args, "upgrade", False))
+    force = bool(getattr(args, "force", False))
 
-    obj, servers = U.load_central_servers()
+    _, servers_all = U.load_central_servers()
+    servers, _disabled = U.split_enabled_servers(servers_all)
     if not servers:
-        print("[ERR] 中央清单为空")
+        print("[ERR] 中央清单为空或全部已禁用（enabled:false）")
         return 1
 
     resolved = _load_resolved()
@@ -172,9 +173,9 @@ def run(args) -> int:
     fail = 0
 
     for name, info in servers.items():
-        cmd = (info or {}).get('command')
-        args_list = (info or {}).get('args') or []
-        if cmd == 'npx' and args_list:
+        cmd = (info or {}).get("command")
+        args_list = (info or {}).get("args") or []
+        if cmd == "npx" and args_list:
             pkg_spec = _extract_pkg_spec(list(args_list))
             if not pkg_spec:
                 fail += 1

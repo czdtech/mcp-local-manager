@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from __future__ import annotations
-
 """mcp central 子命令：管理 ~/.mcp-central/config/mcp-servers.json（CRUD/模板/导入导出/校验/体检）。
 
 特性：
@@ -9,12 +7,13 @@ from __future__ import annotations
 - 所有子命令支持 --json 输出（结构化结果），默认人类可读输出。
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
-import sys
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from .. import utils as U
 
@@ -24,7 +23,7 @@ def _dry(args) -> bool:
     return False
 
 
-def _load_central_or_new() -> Dict[str, Any]:
+def _load_central_or_new() -> dict[str, Any]:
     if U.CENTRAL.exists():
         try:
             data = U.load_json(U.CENTRAL, {})
@@ -47,15 +46,12 @@ def _atomic_write(path: Path, content: str) -> None:
     os.replace(tmp, path)
 
 
-def _save_central(obj: Dict[str, Any], *, dry: bool) -> None:
-    # 校验
-    try:
-        from mcp_validation import validate_central_config_format
-
-        validate_central_config_format(obj)
-    except Exception:
-        # 忽略，下面走更完整的 validate_mcp_servers_config 以触发 schema 校验（若可用）
-        pass
+def _save_central(obj: dict[str, Any], *, dry: bool) -> None:
+    # 写盘前强制校验（即使上层漏调 _validate，也不写入非法配置）
+    ok, msg = _validate(obj)
+    if not ok:
+        print(f"❌ 校验失败: {msg}")
+        raise ValueError(msg)
     try:
         if not dry:
             U.backup(U.CENTRAL)
@@ -65,23 +61,79 @@ def _save_central(obj: Dict[str, Any], *, dry: bool) -> None:
         raise
 
 
-def _validate(obj: Dict[str, Any]) -> Tuple[bool, str]:
+def _validate(obj: dict[str, Any]) -> tuple[bool, str]:
+    """校验“待写入”的 central 对象（内存态），而不是校验磁盘现有文件。"""
     try:
         data = json.loads(json.dumps(obj))
-        from mcp_validation import validate_mcp_servers_config
+    except Exception as e:
+        return False, f"配置无法序列化为 JSON: {e}"
 
-        validate_mcp_servers_config(U.CENTRAL if U.CENTRAL.exists() else U.CENTRAL)
-        # 直接对数据再做基础校验
+    # 1) 基础内容校验：优先复用 mcp_validation（若可用），否则做最小兜底校验
+    try:
         from mcp_validation import validate_central_config_format
 
         validate_central_config_format(data)
-        return True, "ok"
-    except Exception as e:
-        return False, str(e)
+    except Exception:
+        # 兜底：仅做最小结构校验（缺失字段/类型错误）
+        try:
+            if not isinstance(data, dict):
+                raise ValueError("配置必须是对象格式")
+            for k in ("version", "description", "servers"):
+                if k not in data:
+                    raise ValueError(f"缺少必需字段: '{k}'")
+            if not isinstance(data.get("servers"), dict):
+                raise ValueError("'servers' 字段必须是对象格式")
+        except Exception as e:
+            return False, str(e)
+
+    # 2) 额外字段（additionalProperties=false）校验：即使没有 jsonschema 也能拦截明显错误
+    allowed_top = {"version", "description", "servers"}
+    allowed_server = {
+        "enabled",
+        "type",
+        "command",
+        "args",
+        "env",
+        "url",
+        "timeout",
+        "headers",
+        "source",
+    }
+    extra_top = set(data.keys()) - allowed_top
+    if extra_top:
+        return False, f"不允许的顶层字段: {sorted(extra_top)}"
+    servers = data.get("servers") or {}
+    if not isinstance(servers, dict):
+        return False, "'servers' 字段必须是对象格式"
+    for name, info in servers.items():
+        if not isinstance(info, dict):
+            return False, f"服务器 '{name}' 配置必须是对象格式"
+        extra = set(info.keys()) - allowed_server
+        if extra:
+            return False, f"服务器 '{name}' 包含不支持的字段: {sorted(extra)}"
+
+    # 3) 若 jsonschema 可用，则执行完整 schema 校验（更精确的类型/范围校验）
+    # 注意：mcp_validation 在 CLI 场景可用（bin 目录），但库/测试环境不一定可 import。
+    schema_path = Path(__file__).resolve().parents[2] / "config" / "mcp-servers.schema.json"
+    if schema_path.exists():
+        try:
+            import jsonschema
+
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            jsonschema.validate(instance=data, schema=schema)
+        except Exception as e:
+            try:
+                from mcp_validation import format_validation_error
+
+                return False, format_validation_error(e)
+            except Exception:
+                return False, str(e)
+
+    return True, "ok"
 
 
-def _parse_kv_list(items: list[str]) -> Dict[str, str]:
-    out: Dict[str, str] = {}
+def _parse_kv_list(items: list[str]) -> dict[str, str]:
+    out: dict[str, str] = {}
     for it in items or []:
         if "=" not in it:
             continue
@@ -103,7 +155,7 @@ def _print_or_json(obj: Any, use_json: bool) -> None:
 def _cmd_list(args) -> int:
     use_json = bool(args.json)
     data = _load_central_or_new()
-    servers: Dict[str, Any] = data.get("servers", {})
+    servers: dict[str, Any] = data.get("servers", {})
     if use_json:
         out = [
             {
@@ -145,19 +197,19 @@ def _cmd_add(args) -> int:
     if name in sv:
         print(f"❌ 已存在: {name}")
         return 2
-    entry: Dict[str, Any] = {}
-    entry["command"] = getattr(args, 'command', None)
-    if getattr(args, 'args', None):
+    entry: dict[str, Any] = {}
+    entry["command"] = getattr(args, "command", None)
+    if getattr(args, "args", None):
         entry["args"] = args.args
-    if getattr(args, 'env', None):
+    if getattr(args, "env", None):
         entry["env"] = _parse_kv_list(args.env)
-    if getattr(args, 'headers', None):
+    if getattr(args, "headers", None):
         entry["headers"] = _parse_kv_list(args.headers)
-    if getattr(args, 'type', None):
+    if getattr(args, "type", None):
         entry["type"] = args.type
-    if getattr(args, 'url', None):
+    if getattr(args, "url", None):
         entry["url"] = args.url
-    if getattr(args, 'enabled', None) is not None:
+    if getattr(args, "enabled", None) is not None:
         entry["enabled"] = bool(args.enabled)
     sv[name] = entry
     ok, msg = _validate(data)
@@ -182,10 +234,10 @@ def _cmd_update(args) -> int:
     if name not in sv:
         print(f"❌ 未找到: {name}")
         return 2
-    entry: Dict[str, Any] = json.loads(json.dumps(sv[name]))  # deep copy
+    entry: dict[str, Any] = json.loads(json.dumps(sv[name]))  # deep copy
     before = json.loads(json.dumps(entry))
 
-    if getattr(args, 'rename', None):
+    if getattr(args, "rename", None):
         newn = args.rename
         if newn in sv and newn != name:
             print(f"❌ rename 冲突: 目标已存在 {newn}")
@@ -194,21 +246,21 @@ def _cmd_update(args) -> int:
         name = newn
         sv[name] = entry
 
-    if getattr(args, 'command', None):
+    if getattr(args, "command", None):
         entry["command"] = args.command
-    if getattr(args, 'type', None):
+    if getattr(args, "type", None):
         entry["type"] = args.type
-    if getattr(args, 'url', None):
+    if getattr(args, "url", None):
         entry["url"] = args.url
-    if getattr(args, 'enabled', None) is not None:
+    if getattr(args, "enabled", None) is not None:
         entry["enabled"] = bool(args.enabled)
     # args 操作
     arr = list(entry.get("args", []))
-    if getattr(args, 'prepend_arg', None):
+    if getattr(args, "prepend_arg", None):
         arr = args.prepend_arg + arr
-    if getattr(args, 'append_arg', None):
+    if getattr(args, "append_arg", None):
         arr = arr + args.append_arg
-    if getattr(args, 'remove_arg', None):
+    if getattr(args, "remove_arg", None):
         arr = [x for x in arr if x not in set(args.remove_arg)]
     if arr:
         entry["args"] = arr
@@ -216,9 +268,9 @@ def _cmd_update(args) -> int:
         entry.pop("args", None)
     # env 操作
     env = dict(entry.get("env", {}))
-    if getattr(args, 'set_env', None):
+    if getattr(args, "set_env", None):
         env.update(_parse_kv_list(args.set_env))
-    if getattr(args, 'unset_env', None):
+    if getattr(args, "unset_env", None):
         for k in args.unset_env:
             env.pop(k, None)
     if env:
@@ -227,9 +279,9 @@ def _cmd_update(args) -> int:
         entry.pop("env", None)
     # headers
     headers = dict(entry.get("headers", {}))
-    if getattr(args, 'set_header', None):
+    if getattr(args, "set_header", None):
         headers.update(_parse_kv_list(args.set_header))
-    if getattr(args, 'unset_header', None):
+    if getattr(args, "unset_header", None):
         for k in args.unset_header:
             headers.pop(k, None)
     if headers:
@@ -307,7 +359,9 @@ def _cmd_export(args) -> int:
     return 0
 
 
-def _merge_servers(dst: Dict[str, Any], src: Dict[str, Any], prefer_incoming: bool) -> Dict[str, Any]:
+def _merge_servers(
+    dst: dict[str, Any], src: dict[str, Any], prefer_incoming: bool
+) -> dict[str, Any]:
     out = dict(dst)
     for k, v in src.items():
         if k not in out:
@@ -319,7 +373,6 @@ def _merge_servers(dst: Dict[str, Any], src: Dict[str, Any], prefer_incoming: bo
 
 def _cmd_import(args) -> int:
     dry = _dry(args)
-    use_json = bool(args.json)
     src = Path(args.file).expanduser()
     if not src.exists():
         print(f"❌ 文件不存在: {src}")
@@ -334,12 +387,15 @@ def _cmd_import(args) -> int:
     else:
         # merge
         prefer_incoming = bool(args.prefer_incoming)
-        dst_servers = (data.get("servers") or {})
-        src_servers = (incoming.get("servers") or {})
+        dst_servers = data.get("servers") or {}
+        src_servers = incoming.get("servers") or {}
         data["servers"] = _merge_servers(dst_servers, src_servers, prefer_incoming)
         # 版本/描述沿用现有
         data.setdefault("version", incoming.get("version", data.get("version", "1.1.0")))
-        data.setdefault("description", incoming.get("description", data.get("description", "Central MCP Servers config")))
+        data.setdefault(
+            "description",
+            incoming.get("description", data.get("description", "Central MCP Servers config")),
+        )
     ok, msg = _validate(data)
     if not ok:
         print(f"❌ 校验失败: {msg}")
@@ -352,11 +408,17 @@ def _cmd_import(args) -> int:
     return 0
 
 
-_BUILTIN_TEMPLATES: Dict[str, Dict[str, Any]] = {
+_BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {
     "filesystem": {"command": "npx", "args": ["-y", "mcp-server-filesystem@latest", "~/work"]},
-    "sequential-thinking": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"]},
+    "sequential-thinking": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"],
+    },
     "playwright": {"command": "npx", "args": ["-y", "@playwright/mcp@latest", "--headless"]},
-    "serena": {"command": "~/.local/bin/serena", "args": ["start-mcp-server", "--context", "desktop-app"]},
+    "serena": {
+        "command": "~/.local/bin/serena",
+        "args": ["start-mcp-server", "--context", "desktop-app"],
+    },
     "context7": {"command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"]},
     "task-master-ai": {
         "command": "npx",
@@ -475,20 +537,28 @@ def _cmd_validate(args) -> int:
 _URL_RE = re.compile(r"^https?://[A-Za-z0-9_.:-]+(/.*)?$")
 
 
-def _cmd_doctor(args) -> int:
-    use_json = bool(args.json)
-    data = _load_central_or_new()
-    servers: Dict[str, Any] = data.get("servers", {})
+def build_doctor_report(data: dict[str, Any]) -> dict[str, Any]:
+    """对 central 配置做只读体检，返回结构化报告（可被 mcp doctor 复用）。"""
+    servers: dict[str, Any] = data.get("servers", {})
     total = len(servers)
     issues: list[str] = []
-    per: Dict[str, Any] = {}
+    per: dict[str, Any] = {}
+
     def _which(cmd: str) -> bool:
         from shutil import which
+
         if os.path.isabs(cmd):
             return Path(cmd).expanduser().exists()
         return which(cmd) is not None
 
     for name, info in servers.items():
+        if not bool((info or {}).get("enabled", True)):
+            per[name] = {
+                "status": "skipped",
+                "issues": [],
+                "suggestions": ["已在 central 禁用（enabled:false）"],
+            }
+            continue
         c_issues: list[str] = []
         suggestions: list[str] = []
         cmd = info.get("command")
@@ -498,7 +568,9 @@ def _cmd_doctor(args) -> int:
             if cmd == "npx":
                 if not _which("npx"):
                     c_issues.append("npx 不可用")
-                    suggestions.append("请安装 node/npm 或使用全局二进制：npm i -g <pkg>@latest 并更新 command")
+                    suggestions.append(
+                        "请安装 node/npm 或使用全局二进制：npm i -g <pkg>@latest 并更新 command"
+                    )
             else:
                 if not _which(cmd):
                     c_issues.append(f"命令未找到: {cmd}")
@@ -515,19 +587,35 @@ def _cmd_doctor(args) -> int:
                 timeout_val = None
             if timeout_val is None:
                 c_issues.append("task-master-ai 未配置 timeout（建议 >= 300 秒，例如 300/600）")
-                suggestions.append("操作示例: mcp central update task-master-ai --json（编辑输出或文件，将 timeout 设置为 300）")
+                suggestions.append(
+                    "操作示例: mcp central update task-master-ai --json（编辑输出或文件，"
+                    "将 timeout 设置为 300）"
+                )
             elif timeout_val < 300:
                 c_issues.append(f"task-master-ai timeout 过小: {timeout_val}（建议至少 300）")
-                suggestions.append("操作示例: mcp central update task-master-ai --json（编辑输出或文件，将 timeout 调整为 300/600）")
+                suggestions.append(
+                    "操作示例: mcp central update task-master-ai --json（编辑输出或文件，"
+                    "将 timeout 调整为 300/600）"
+                )
 
             env = info.get("env") or {}
             tools_mode = str(env.get("TASK_MASTER_TOOLS", "")).strip()
             if not tools_mode:
-                c_issues.append("task-master-ai 未设置 env.TASK_MASTER_TOOLS（建议 standard，或按需 core/lean/自定义列表）")
-                suggestions.append("示例: mcp central update task-master-ai --set-env TASK_MASTER_TOOLS=standard")
+                c_issues.append(
+                    "task-master-ai 未设置 env.TASK_MASTER_TOOLS（建议 standard，"
+                    "或按需 core/lean/自定义列表）"
+                )
+                suggestions.append(
+                    "示例: mcp central update task-master-ai --set-env TASK_MASTER_TOOLS=standard"
+                )
             elif tools_mode.lower() == "all":
-                c_issues.append("task-master-ai 使用 TASK_MASTER_TOOLS=all，可能导致加载过慢（建议改为 standard/core/lean）")
-                suggestions.append("示例: mcp central update task-master-ai --set-env TASK_MASTER_TOOLS=standard")
+                c_issues.append(
+                    "task-master-ai 使用 TASK_MASTER_TOOLS=all，可能导致加载过慢"
+                    "（建议改为 standard/core/lean）"
+                )
+                suggestions.append(
+                    "示例: mcp central update task-master-ai --set-env TASK_MASTER_TOOLS=standard"
+                )
 
         per[name] = {
             "status": "passed" if not c_issues else "failed",
@@ -535,170 +623,228 @@ def _cmd_doctor(args) -> int:
             "suggestions": suggestions,
         }
         issues += [f"{name}: {x}" for x in c_issues]
+
     status = "passed" if not issues else "failed"
-    out = {"status": status, "total_servers": total, "issues": issues, "servers": per}
+    return {"status": status, "total_servers": total, "issues": issues, "servers": per}
+
+
+def _cmd_doctor(args) -> int:
+    use_json = bool(args.json)
+    data = _load_central_or_new()
+    out = build_doctor_report(data)
     _print_or_json(out, use_json)
-    return 0 if status == "passed" else 1
+    return 0 if out.get("status") == "passed" else 1
 
 
 def run(args) -> int:
     # 交互增强：当子命令缺少必要参数或显式 --interactive 时，进入交互模式
-    def _choose_server(prompt: str, allow_new: bool=False) -> str | None:
-        data = _load_central_or_new(); names = sorted((data.get('servers') or {}).keys())
+    def _choose_server(prompt: str, allow_new: bool = False) -> str | None:
+        data = _load_central_or_new()
+        names = sorted((data.get("servers") or {}).keys())
         if allow_new:
             print("0) 新建名称…")
-        for i,n in enumerate(names, start=1):
+        for i, n in enumerate(names, start=1):
             print(f"{i}) {n}")
         s = input(f"{prompt} 输入编号: ").strip()
-        if s == '0' and allow_new:
-            return input('输入新名称: ').strip() or None
+        if s == "0" and allow_new:
+            return input("输入新名称: ").strip() or None
         if s.isdigit():
-            idx=int(s); 
-            if 1<=idx<=len(names):
-                return names[idx-1]
+            idx = int(s)
+            if 1 <= idx <= len(names):
+                return names[idx - 1]
         return None
 
     cmd = getattr(args, "central_cmd", None)
     if cmd is None:
         # 简化交互菜单（新手模式）：列出、模板、校验/体检，其他用简短入口
         while True:
-            print('\nCentral 管理（简化交互）:')
-            print('  1) 列表/查看')
-            print('  2) 新增/更新/启用/禁用')
-            print('  3) 模板创建')
-            print('  4) 导入/导出')
-            print('  5) 校验/体检')
-            print('  0) 退出')
-            sel = input('选择: ').strip() or '0'
-            if sel == '0':
+            print("\nCentral 管理（简化交互）:")
+            print("  1) 列表/查看")
+            print("  2) 新增/更新/启用/禁用")
+            print("  3) 模板创建")
+            print("  4) 导入/导出")
+            print("  5) 校验/体检")
+            print("  0) 退出")
+            sel = input("选择: ").strip() or "0"
+            if sel == "0":
                 return 0
-            if sel == '1':
-                _cmd_list(type('o',(object,),{'json':False}))
-                n = input('查看某个服务? 输入名称或回车跳过: ').strip()
+            if sel == "1":
+                _cmd_list(type("o", (object,), {"json": False}))
+                n = input("查看某个服务? 输入名称或回车跳过: ").strip()
                 if n:
-                    _cmd_show(type('o',(object,),{'name':n,'json':False}))
-            elif sel == '2':
-                name = _choose_server('选择服务 (或 0 新建)', allow_new=True)
+                    _cmd_show(type("o", (object,), {"name": n, "json": False}))
+            elif sel == "2":
+                name = _choose_server("选择服务 (或 0 新建)", allow_new=True)
                 if not name:
                     continue
-                op = input('操作: [u]pdate/[e]nable/[d]isable/[r]emove (回车=update): ').strip().lower() or 'u'
-                if op.startswith('e'):
-                    _cmd_toggle(type('o',(object,),{'name':name,'json':False}), True)
-                elif op.startswith('d'):
-                    _cmd_toggle(type('o',(object,),{'name':name,'json':False}), False)
-                elif op.startswith('r'):
-                    _cmd_remove(type('o',(object,),{'name':name,'json':False}))
+                op = (
+                    input("操作: [u]pdate/[e]nable/[d]isable/[r]emove (回车=update): ")
+                    .strip()
+                    .lower()
+                    or "u"
+                )
+                if op.startswith("e"):
+                    _cmd_toggle(type("o", (object,), {"name": name, "json": False}), True)
+                elif op.startswith("d"):
+                    _cmd_toggle(type("o", (object,), {"name": name, "json": False}), False)
+                elif op.startswith("r"):
+                    _cmd_remove(type("o", (object,), {"name": name, "json": False}))
                 else:
-                    run(type('args',(object,),{'central_cmd':'update','interactive':True,'json':False,'name':name}))
-            elif sel == '3':
-                run(type('args',(object,),{'central_cmd':'template','interactive':True,'json':False}))
-            elif sel == '4':
-                io = input('导入(i) / 导出(o): ').strip().lower()
-                if io.startswith('i'):
-                    run(type('args',(object,),{'central_cmd':'import','interactive':True,'json':False}))
+                    run(
+                        type(
+                            "args",
+                            (object,),
+                            {
+                                "central_cmd": "update",
+                                "interactive": True,
+                                "json": False,
+                                "name": name,
+                            },
+                        )
+                    )
+            elif sel == "3":
+                run(
+                    type(
+                        "args",
+                        (object,),
+                        {"central_cmd": "template", "interactive": True, "json": False},
+                    )
+                )
+            elif sel == "4":
+                io = input("导入(i) / 导出(o): ").strip().lower()
+                if io.startswith("i"):
+                    run(
+                        type(
+                            "args",
+                            (object,),
+                            {"central_cmd": "import", "interactive": True, "json": False},
+                        )
+                    )
                 else:
-                    run(type('args',(object,),{'central_cmd':'export','interactive':True,'json':False}))
-            elif sel == '5':
-                _cmd_validate(type('o',(object,),{'json':False}))
-                _cmd_doctor(type('o',(object,),{'json':False}))
+                    run(
+                        type(
+                            "args",
+                            (object,),
+                            {"central_cmd": "export", "interactive": True, "json": False},
+                        )
+                    )
+            elif sel == "5":
+                _cmd_validate(type("o", (object,), {"json": False}))
+                _cmd_doctor(type("o", (object,), {"json": False}))
             else:
-                print('无效选择')
+                print("无效选择")
     if cmd == "list":
         return _cmd_list(args)
     if cmd == "show":
-        if getattr(args,'interactive',False) or not getattr(args,'name',None):
-            name = _choose_server('选择要查看的服务')
+        if getattr(args, "interactive", False) or not getattr(args, "name", None):
+            name = _choose_server("选择要查看的服务")
             if not name:
-                print('已取消'); return 0
-            setattr(args,'name',name)
+                print("已取消")
+                return 0
+            args.name = name
         return _cmd_show(args)
     if cmd == "add":
-        if getattr(args,'interactive',False) or not getattr(args,'name',None) or not getattr(args,'command',None):
-            name = getattr(args,'name',None) or input('新服务名称: ').strip()
-            setattr(args,'name', name)
-            if not getattr(args,'command',None):
-                setattr(args,'command', (input('command (默认 npx): ').strip() or 'npx'))
-            if not getattr(args,'args',None):
-                raw = input('args（以空格分隔，可留空）: ').strip()
-                setattr(args,'args', raw.split() if raw else [])
-            if getattr(args,'env',None) is None:
-                raw = input('env（形如 KEY=VAL 用空格分隔，可留空）: ').strip()
-                setattr(args,'env', raw.split() if raw else [])
-            if getattr(args,'enabled',None) is None:
-                yn = (input('是否启用? [Y/n]: ').strip().lower() or 'y')
-                setattr(args,'enabled', yn.startswith('y'))
+        if (
+            getattr(args, "interactive", False)
+            or not getattr(args, "name", None)
+            or not getattr(args, "command", None)
+        ):
+            name = getattr(args, "name", None) or input("新服务名称: ").strip()
+            args.name = name
+            if not getattr(args, "command", None):
+                args.command = input("command (默认 npx): ").strip() or "npx"
+            if not getattr(args, "args", None):
+                raw = input("args（以空格分隔，可留空）: ").strip()
+                args.args = raw.split() if raw else []
+            if getattr(args, "env", None) is None:
+                raw = input("env（形如 KEY=VAL 用空格分隔，可留空）: ").strip()
+                args.env = raw.split() if raw else []
+            if getattr(args, "enabled", None) is None:
+                yn = input("是否启用? [Y/n]: ").strip().lower() or "y"
+                args.enabled = yn.startswith("y")
         return _cmd_add(args)
     if cmd == "update":
-        if getattr(args,'interactive',False) or not getattr(args,'name',None):
-            name = _choose_server('选择要更新的服务')
+        if getattr(args, "interactive", False) or not getattr(args, "name", None):
+            name = _choose_server("选择要更新的服务")
             if not name:
-                print('已取消'); return 0
-            setattr(args,'name',name)
+                print("已取消")
+                return 0
+            args.name = name
         return _cmd_update(args)
     if cmd == "remove":
-        if getattr(args,'interactive',False) or not getattr(args,'name',None):
-            name = _choose_server('选择要删除的服务')
+        if getattr(args, "interactive", False) or not getattr(args, "name", None):
+            name = _choose_server("选择要删除的服务")
             if not name:
-                print('已取消'); return 0
-            setattr(args,'name',name)
+                print("已取消")
+                return 0
+            args.name = name
         return _cmd_remove(args)
     if cmd == "enable":
-        if getattr(args,'interactive',False) or not getattr(args,'name',None):
-            name = _choose_server('选择要启用的服务')
+        if getattr(args, "interactive", False) or not getattr(args, "name", None):
+            name = _choose_server("选择要启用的服务")
             if not name:
-                print('已取消'); return 0
-            setattr(args,'name',name)
+                print("已取消")
+                return 0
+            args.name = name
         return _cmd_toggle(args, True)
     if cmd == "disable":
-        if getattr(args,'interactive',False) or not getattr(args,'name',None):
-            name = _choose_server('选择要禁用的服务')
+        if getattr(args, "interactive", False) or not getattr(args, "name", None):
+            name = _choose_server("选择要禁用的服务")
             if not name:
-                print('已取消'); return 0
-            setattr(args,'name',name)
+                print("已取消")
+                return 0
+            args.name = name
         return _cmd_toggle(args, False)
     if cmd == "export":
-        if getattr(args,'interactive',False) and not getattr(args,'file',None):
-            f = input('导出文件路径（留空输出到 stdout）: ').strip()
-            setattr(args,'file', f if f else None)
+        if getattr(args, "interactive", False) and not getattr(args, "file", None):
+            f = input("导出文件路径（留空输出到 stdout）: ").strip()
+            args.file = f if f else None
         return _cmd_export(args)
     if cmd == "import":
-        if getattr(args,'interactive',False) and not getattr(args,'file',None):
-            f = input('导入文件路径: ').strip()
-            setattr(args,'file', f)
-            mode = (input('模式: [m]erge / [r]eplace? ').strip().lower() or 'm')
-            setattr(args,'replace', mode.startswith('r'))
-            pref = (input('冲突偏好: [e]xisting / [i]ncoming? ').strip().lower() or 'e')
-            setattr(args,'prefer_incoming', pref.startswith('i'))
+        if getattr(args, "interactive", False) and not getattr(args, "file", None):
+            f = input("导入文件路径: ").strip()
+            args.file = f
+            mode = input("模式: [m]erge / [r]eplace? ").strip().lower() or "m"
+            args.replace = mode.startswith("r")
+            pref = input("冲突偏好: [e]xisting / [i]ncoming? ").strip().lower() or "e"
+            args.prefer_incoming = pref.startswith("i")
         return _cmd_import(args)
     if cmd == "template":
-        if getattr(args,'interactive',False) or not getattr(args,'template',None) or not getattr(args,'name',None):
-            print('可选模板:')
-            for i,k in enumerate(sorted(_BUILTIN_TEMPLATES.keys()), start=1):
-                desc = _TPL_DESC.get(k, '')
-                extra = f" - {desc}" if desc else ''
+        if (
+            getattr(args, "interactive", False)
+            or not getattr(args, "template", None)
+            or not getattr(args, "name", None)
+        ):
+            print("可选模板:")
+            for i, k in enumerate(sorted(_BUILTIN_TEMPLATES.keys()), start=1):
+                desc = _TPL_DESC.get(k, "")
+                extra = f" - {desc}" if desc else ""
                 print(f"  {i}) {k}{extra}")
-            t = input('选择模板编号（或输入名称）: ').strip()
-            keys=sorted(_BUILTIN_TEMPLATES.keys())
+            t = input("选择模板编号（或输入名称）: ").strip()
+            keys = sorted(_BUILTIN_TEMPLATES.keys())
             if t.isdigit():
-                idx=int(t); 
-                if 1<=idx<=len(keys):
-                    setattr(args,'template', keys[idx-1])
-            if not getattr(args,'template',None):
-                setattr(args,'template', t or 'custom-npx')
-            if not getattr(args,'name',None):
-                setattr(args,'name', input('新服务名称: ').strip())
-            if not getattr(args,'args',None):
-                raw = input('模板 args（空格分隔，可留空）: ').strip()
-                setattr(args,'args', raw.split() if raw else [])
+                idx = int(t)
+                if 1 <= idx <= len(keys):
+                    args.template = keys[idx - 1]
+            if not getattr(args, "template", None):
+                args.template = t or "custom-npx"
+            if not getattr(args, "name", None):
+                args.name = input("新服务名称: ").strip()
+            if not getattr(args, "args", None):
+                raw = input("模板 args（空格分隔，可留空）: ").strip()
+                args.args = raw.split() if raw else []
         return _cmd_template(args)
     if cmd == "dup":
-        if getattr(args,'interactive',False) or (not getattr(args,'src',None) or not getattr(args,'dest',None)):
-            src = _choose_server('选择要复制的服务')
+        if getattr(args, "interactive", False) or (
+            not getattr(args, "src", None) or not getattr(args, "dest", None)
+        ):
+            src = _choose_server("选择要复制的服务")
             if not src:
-                print('已取消'); return 0
-            setattr(args,'src', src)
-            if not getattr(args,'dest',None):
-                setattr(args,'dest', input('输入新名称: ').strip())
+                print("已取消")
+                return 0
+            args.src = src
+            if not getattr(args, "dest", None):
+                args.dest = input("输入新名称: ").strip()
         return _cmd_dup(args)
     if cmd == "validate":
         return _cmd_validate(args)

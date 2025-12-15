@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MCP Local Manager UI</title>
+  <style>
+    :root {
+      --bg:#0b1220;
+      --card:#0f1a2e;
+      --text:#e6eefc;
+      --muted:#9fb3d7;
+      --line:#243554;
+      --ok:#2dd4bf;
+      --warn:#fbbf24;
+      --bad:#fb7185;
+      --btn:#1f2a44;
+      --btn2:#334a7a;
+    }
+
+    body {
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: linear-gradient(180deg, #0b1220, #070b14);
+      color: var(--text);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .top {
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+    .title { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
+    .pill {
+      font-size: 12px;
+      padding: 6px 10px;
+      border:1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+    }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    select {
+      background: var(--card);
+      color: var(--text);
+      border:1px solid var(--line);
+      padding:10px 12px;
+      border-radius: 10px;
+    }
+    button {
+      background: var(--btn);
+      color: var(--text);
+      border:1px solid var(--line);
+      padding:10px 12px;
+      border-radius: 10px;
+      cursor:pointer;
+    }
+    input {
+      background: var(--card);
+      color: var(--text);
+      border:1px solid var(--line);
+      padding:10px 12px;
+      border-radius: 10px;
+      outline: none;
+    }
+    button:hover { background: var(--btn2); }
+    .card {
+      margin-top: 14px;
+      background: rgba(15,26,46,.9);
+      border:1px solid var(--line);
+      border-radius: 14px;
+      overflow:hidden;
+    }
+    .card h3 {
+      margin:0;
+      padding: 14px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .meta { padding: 12px 16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .msg {
+      padding: 10px 16px;
+      border-top:1px solid var(--line);
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+    table { width:100%; border-collapse: collapse; }
+    th, td { text-align:left; padding: 10px 12px; border-bottom:1px solid var(--line); font-size: 13px; }
+    th { color: var(--muted); font-weight: 600; }
+    .k {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    .badge { font-size: 12px; padding: 4px 8px; border-radius: 999px; border:1px solid var(--line); color: var(--muted); }
+    .b-ok { border-color: rgba(45,212,191,.35); color: var(--ok); }
+    .b-warn { border-color: rgba(251,191,36,.35); color: var(--warn); }
+    .b-bad { border-color: rgba(251,113,133,.35); color: var(--bad); }
+    .switch { display:inline-flex; align-items:center; gap:8px; }
+    .switch input { width: 42px; height: 22px; }
+    .hint { color: var(--muted); font-size: 12px; }
+    .subtle { color: var(--muted); }
+    .right { text-align:right; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="row">
+        <div class="title">MCP Local Manager UI</div>
+        <span class="pill">列表 + 开关，立即写入（仅本机 127.0.0.1）</span>
+      </div>
+      <div class="row">
+        <label class="hint">目标：</label>
+        <select id="client"></select>
+        <button id="refresh">刷新</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Central（统一清单）</h3>
+      <div class="meta" id="centralMeta"></div>
+      <div class="msg" id="centralMsg"></div>
+    </div>
+
+    <div class="card">
+      <h3>服务列表（开关即落地）</h3>
+      <div class="msg" id="warnBox"></div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 260px;">name</th>
+            <th>central</th>
+            <th style="width: 260px;">标记/操作</th>
+            <th>target</th>
+            <th class="right" style="width: 140px;">落地开关</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>管理中心（central：删除/启用禁用）</h3>
+      <div class="meta">
+        <div class="row">
+          <span class="hint">提示：要新增条目，请在服务列表对 target-only 点“收录”；或用 CLI `mcp central add`。</span>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 260px;">name</th>
+            <th style="width: 120px;">enabled</th>
+            <th style="width: 220px;">source</th>
+            <th>command</th>
+            <th class="right" style="width: 280px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="centralRows"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>操作日志</h3>
+      <div class="msg" id="log"></div>
+    </div>
+  </div>
+
+<script>
+const qs = new URLSearchParams(location.search);
+const token = qs.get("token") || "";
+const $ = (id) => document.getElementById(id);
+
+function log(line) {
+  const el = $("log");
+  const now = new Date().toLocaleTimeString();
+  el.textContent = `[${now}] ${line}\n` + (el.textContent || "");
+}
+
+async function apiGet(path) {
+  const r = await fetch(path, { headers: { "X-MCP-Token": token } });
+  if (!r.ok) throw new Error(await r.text());
+  return await r.json();
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-MCP-Token": token,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return await r.json();
+}
+
+function badge(text, cls) {
+  const span = document.createElement("span");
+  span.className = `badge ${cls||""}`;
+  span.textContent = text;
+  return span;
+}
+
+function setCentral(central) {
+  const meta = $("centralMeta");
+  meta.innerHTML = "";
+  meta.appendChild(
+    badge(central.exists ? "central: 存在" : "central: 缺失", central.exists ? "b-ok" : "b-bad")
+  );
+  meta.appendChild(badge(central.valid ? "校验: 通过" : "校验: 失败", central.valid ? "b-ok" : "b-bad"));
+  meta.appendChild(
+    badge(`服务: ${central.total} (启用 ${central.enabled} / 禁用 ${central.disabled})`, "")
+  );
+  meta.appendChild(badge(`路径: ${central.path}`, ""));
+  $("centralMsg").textContent = central.valid ? "" : (central.message || "");
+}
+
+function renderCentralAdmin(central) {
+  const rows = $("centralRows");
+  rows.innerHTML = "";
+  const servers = central.servers || {};
+  Object.keys(servers).sort().forEach((name) => {
+    const info = servers[name] || {};
+    const tr = document.createElement("tr");
+
+    const tdN = document.createElement("td");
+    tdN.innerHTML = `<span class="k">${name}</span>`;
+
+    const tdE = document.createElement("td");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = info.enabled !== false;
+    cb.addEventListener("change", async () => {
+      cb.disabled = true;
+      try {
+        await apiPost("/api/central/set-enabled", { name, enabled: cb.checked });
+        log(`central 已${cb.checked ? "启用" : "禁用"}：${name}`);
+      } catch (e) {
+        cb.checked = !cb.checked;
+        log(`central 启用切换失败：${e}`);
+        alert(String(e));
+      } finally {
+        await refresh();
+        cb.disabled = false;
+      }
+    });
+    tdE.appendChild(cb);
+
+    const tdS = document.createElement("td");
+    tdS.appendChild(badge((info.source || "").trim() || "central", ""));
+
+    const tdC = document.createElement("td");
+    tdC.textContent = String(info.command || "");
+    tdC.className = "k";
+
+    const tdA = document.createElement("td");
+    tdA.className = "right";
+    const btnGlobalRm = document.createElement("button");
+    btnGlobalRm.textContent = "全局移除(本地)";
+    btnGlobalRm.addEventListener("click", async () => {
+      if (!confirm(`确认从所有目标端移除：${name}？\\n（会对已存在的目标配置做备份并写入；不会删除 central）`)) {
+        return;
+      }
+      btnGlobalRm.disabled = true;
+      try {
+        const res = await apiPost("/api/targets/remove", { server: name });
+        (res.targets || []).forEach((t) => {
+          (t.notes || []).forEach((n) => log(n));
+          if (t.changed) log(`已从 ${t.client} 移除：${name}`);
+          else if (t.skipped) log(`跳过 ${t.client}：${t.skipped}`);
+        });
+        const errs = res.errors || {};
+        Object.keys(errs).forEach((c) => log(`⚠️ ${c} 失败：${errs[c]}`));
+      } catch (e) {
+        log(`全局移除失败：${e}`);
+        alert(String(e));
+      } finally {
+        await refresh();
+        btnGlobalRm.disabled = false;
+      }
+    });
+    tdA.appendChild(btnGlobalRm);
+    btnGlobalRm.style.marginRight = "10px";
+    const btnDel = document.createElement("button");
+    btnDel.textContent = "删除 central";
+    btnDel.addEventListener("click", async () => {
+      if (!confirm(`确认从 central 删除：${name}？\\n（不会自动清理各目标端；可能导致 target-only 漂移）`)) {
+        return;
+      }
+      btnDel.disabled = true;
+      try {
+        const res = await apiPost("/api/central/delete", { name });
+        if (res.notes && res.notes.length) res.notes.forEach(n => log(n));
+        log(`已从 central 删除：${name}`);
+      } catch (e) {
+        log(`删除失败：${e}`);
+        alert(String(e));
+      } finally {
+        await refresh();
+        btnDel.disabled = false;
+      }
+    });
+    tdA.appendChild(btnDel);
+
+    tr.appendChild(tdN);
+    tr.appendChild(tdE);
+    tr.appendChild(tdS);
+    tr.appendChild(tdC);
+    tr.appendChild(tdA);
+    rows.appendChild(tr);
+  });
+}
+
+function renderRows(central, target) {
+  const present = new Set(target.present || []);
+  const disabledPresent = new Set(target.disabled_present || []);
+  const rows = $("rows");
+  rows.innerHTML = "";
+
+  const warn = [];
+  if (!central.exists) {
+    warn.push("未找到 central；建议先运行 `mcp onboard` 或 `bash scripts/install-mac.sh`。");
+  }
+  if (!central.valid) {
+    warn.push("central 校验失败：请先修复 central（或用 `mcp central validate` / `mcp doctor` 查看原因）。");
+  }
+  const unknownCount = (target.unknown || []).length;
+  if (unknownCount) {
+    warn.push(`目标端存在 central 未收录条目：${unknownCount} 个（已在列表标记为 target-only）`);
+  }
+  const disabledCount = (target.disabled_present || []).length;
+  if (disabledCount) {
+    warn.push(`目标端仍配置了 central 已禁用条目：${disabledCount} 个（建议关闭或在 central 启用）`);
+  }
+  if (target.claude_project_overrides && target.claude_project_overrides.count > 0) {
+    warn.push(
+      `Claude 检测到项目级覆盖（~/.claude.json projects.*.mcpServers 非空）：`
+        + `${target.claude_project_overrides.count} 个项目。`
+    );
+  }
+  $("warnBox").textContent = warn.length ? warn.map(s => `- ${s}`).join("\n") : "（无）";
+
+  const servers = central.servers || {};
+  const names = new Set(Object.keys(servers));
+  (target.present || []).forEach((n) => names.add(n));
+
+  Array.from(names).sort().forEach((name) => {
+    const inCentral = Object.prototype.hasOwnProperty.call(servers, name);
+    const info = inCentral ? (servers[name] || {}) : {};
+    const cEnabled = inCentral ? (info.enabled !== false) : false;
+    const isOn = present.has(name);
+
+    const tr = document.createElement("tr");
+    const tdName = document.createElement("td");
+    tdName.innerHTML = `<span class="k">${name}</span>`;
+
+    const tdC = document.createElement("td");
+    if (inCentral) {
+      tdC.appendChild(badge(cEnabled ? "enabled" : "disabled", cEnabled ? "b-ok" : "b-warn"));
+    } else {
+      tdC.appendChild(badge("未收录", "b-warn"));
+    }
+
+    const tdTag = document.createElement("td");
+    if (inCentral) {
+      const src = (info.source || "").trim();
+      tdTag.appendChild(badge(src ? src : "central", src ? "" : ""));
+      if (isOn) {
+        const btnRm = document.createElement("button");
+        btnRm.style.marginLeft = "10px";
+        btnRm.textContent = "移除";
+        btnRm.addEventListener("click", async () => {
+          btnRm.disabled = true;
+          try {
+            const res = await apiPost("/api/toggle", {
+              client: $("client").value,
+              server: name,
+              on: false,
+            });
+            if (res.notes && res.notes.length) res.notes.forEach(n => log(n));
+            log(`已移除：${name}`);
+          } catch (e) {
+            log(`移除失败：${e}`);
+            alert(String(e));
+          } finally {
+            await refresh();
+            btnRm.disabled = false;
+          }
+        });
+        tdTag.appendChild(btnRm);
+      }
+    } else {
+      tdTag.appendChild(badge("target-only", "b-warn"));
+      const btn = document.createElement("button");
+      btn.style.marginLeft = "10px";
+      btn.textContent = "收录";
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          const res = await apiPost("/api/import", {
+            client: $("client").value,
+            server: name,
+          });
+          if (res.notes && res.notes.length) res.notes.forEach(n => log(n));
+          log(`已收录到 central：${name}`);
+        } catch (e) {
+          log(`收录失败：${e}`);
+          alert(String(e));
+        } finally {
+          await refresh();
+          btn.disabled = false;
+        }
+      });
+      tdTag.appendChild(btn);
+
+      const btnRm = document.createElement("button");
+      btnRm.style.marginLeft = "10px";
+      btnRm.textContent = "移除";
+      btnRm.addEventListener("click", async () => {
+        btnRm.disabled = true;
+        try {
+          const res = await apiPost("/api/toggle", {
+            client: $("client").value,
+            server: name,
+            on: false,
+          });
+          if (res.notes && res.notes.length) res.notes.forEach(n => log(n));
+          log(`已移除 target-only：${name}`);
+        } catch (e) {
+          log(`移除失败：${e}`);
+          alert(String(e));
+        } finally {
+          await refresh();
+          btnRm.disabled = false;
+        }
+      });
+      tdTag.appendChild(btnRm);
+    }
+
+    const tdT = document.createElement("td");
+    if (disabledPresent.has(name)) {
+      tdT.appendChild(badge("central disabled but present", "b-warn"));
+    } else {
+      tdT.appendChild(badge(isOn ? "present" : "absent", isOn ? "b-ok" : ""));
+    }
+
+    const tdS = document.createElement("td");
+    tdS.className = "right";
+    const wrap = document.createElement("span");
+    wrap.className = "switch";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = isOn;
+    // central disabled：允许关，不允许开；未收录：只允许关（关掉后就无法再打开，除非先收录）
+    if (!inCentral && !isOn) cb.disabled = true;
+    if (inCentral && !cEnabled && !isOn) cb.disabled = true;
+    cb.addEventListener("change", async () => {
+      const want = cb.checked;
+      cb.disabled = true;
+      try {
+        const res = await apiPost("/api/toggle", {
+          client: $("client").value,
+          server: name,
+          on: want,
+        });
+        if (res.notes && res.notes.length) res.notes.forEach(n => log(n));
+        log(`已${want ? "开启" : "关闭"}：${name}`);
+      } catch (e) {
+        cb.checked = !want;
+        log(`失败：${e}`);
+        alert(String(e));
+      } finally {
+        await refresh();
+      }
+    });
+    wrap.appendChild(cb);
+    const label = document.createElement("span");
+    label.className = "subtle";
+    label.textContent = isOn ? "ON" : "OFF";
+    wrap.appendChild(label);
+    tdS.appendChild(wrap);
+
+    tr.appendChild(tdName);
+    tr.appendChild(tdC);
+    tr.appendChild(tdTag);
+    tr.appendChild(tdT);
+    tr.appendChild(tdS);
+    rows.appendChild(tr);
+  });
+}
+
+async function refresh() {
+  if (!token) {
+    $("centralMsg").textContent = "缺少 token，请使用终端输出的 URL 打开。";
+    return;
+  }
+  const client = $("client").value;
+  const s = await apiGet(`/api/state?client=${encodeURIComponent(client)}`);
+  setCentral(s.central);
+  renderCentralAdmin(s.central);
+  renderRows(s.central, s.target);
+}
+
+async function init() {
+  if (!token) {
+    $("centralMsg").textContent = "缺少 token，请使用终端输出的 URL 打开。";
+    return;
+  }
+  const meta = await apiGet("/api/clients");
+  const sel = $("client");
+  sel.innerHTML = "";
+  meta.clients.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.key;
+    opt.textContent = c.label;
+    sel.appendChild(opt);
+  });
+  sel.value = meta.default || "cursor";
+  $("refresh").addEventListener("click", refresh);
+  sel.addEventListener("change", refresh);
+
+  await refresh();
+  log("UI 已就绪：开关即写入（写入前自动生成 *.backup）");
+}
+
+init().catch((e) => {
+  log(`初始化失败：${e}`);
+  alert(String(e));
+});
+</script>
+</body>
+</html>

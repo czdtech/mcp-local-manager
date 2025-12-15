@@ -17,7 +17,7 @@
     - 下发后直接启动：在 `mcp run` 交互最后输入启动命令（如 `claude`），或回车跳过
     - 为 VS Code/Cursor 按需落地：运行 `mcp run`，交互中选择 Cursor/VS Code 并勾选服务
   - 可选脚本路径：`bash scripts/mcp-sync.sh` → `bash scripts/mcp-check.sh`（仅当你需要一次性全量落地时使用）
-  - 每次落地前，脚本会生成时间戳备份（`*.YYYYMMDD_HHMMSS.backup`）。
+  - 每次落地前，会生成单槽备份（`*.backup`，覆盖写）；如需回滚可用 `mcp undo <file>.backup`。
 - 体检脚本改进点（已内置在本仓库）
   - Codex TOML 兼容：缺少 Python 3.11 的 `tomllib` 时，使用轻量解析器回退，仅读取 `[mcp_servers.*]` 与 `.env` 段。
   - Claude 注册表解析：自动适配 `claude mcp list` 输出（无 `--json` 也能解析），且延长超时，减少误报；当文件端已完整覆盖时，不再因注册表缺项告警。
@@ -197,7 +197,7 @@ droid mcp add playwright "npx -y @playwright/mcp@latest --headless --no-sandbox 
 - Claude 项目级覆盖导致“清不干净”
 - 现象：`mcp status` 显示 `Claude(register)` 仍有某项（如 `filesystem`），`claude mcp list` 也显示 Connected；但已清空 `~/.claude/settings.json` 与注册表。
   - 根因：`~/.claude.json` 内 `projects.*.mcpServers` 会覆盖/合并显示注册表与文件端。
-  - 处置：清空 `~/.claude.json` 中所有 `projects.*.mcpServers`；已将此步骤自动化到 `scripts/onboard-cursor-minimal.sh`，并增强 `mcp` 的注册表读取稳健性（延长超时、合并 stdout+stderr）。
+  - 处置：清空 `~/.claude.json` 中所有 `projects.*.mcpServers`；现在 `mcp clear --client claude` 会自动完成该步骤（`scripts/onboard-cursor-minimal.sh` 亦会调用 clear），并增强 `mcp` 的注册表读取稳健性（延长超时、合并 stdout+stderr）。
 
 - 误用系统 `cc` 导致“连通性探测”异常输出
   - 现象：体检脚本打印 `[cc] Claude Code: cc mcp list`，随后出现 clang 报错。

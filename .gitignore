@@ -43,6 +43,7 @@ test_venv/
 venv/
 env/
 ENV/
+.venv*/
 
 # IDE
 .vscode/
@@ -57,6 +58,7 @@ Thumbs.db
 # Backup files
 *.backup
 *.bak
+backups/
 
 # Local config
 .config/

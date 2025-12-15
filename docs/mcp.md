@@ -3,6 +3,8 @@
 `mcp` 是一个极简 CLI，用于“按客户端/IDE 精准落地 MCP 配置”，避免一次性加载全部服务器导致上下文与 Token 消耗过大。
 
 - 默认理念：中央清单未显式 `enabled: false` 的条目都视为启用；真正是否“加载”，由你对某个 CLI/IDE 的落地选择决定。
+- 行为约束：`mcp run` 默认只下发 central 中“已启用”的服务；被 `enabled: false` 禁用的条目不会被下发（需先在 central 启用）。
+- 状态基线：`mcp status` 的 on/off 以“已启用”集合为基线；若目标端仍配置了 central 已禁用的服务，会提示告警。
 - 不修改非 MCP 段；Claude 同步时会清理注册表的多余项、补齐缺失项。
 
 ## 快速开始
@@ -46,6 +48,22 @@ mcp check
 
 交互优先，同时保留少量参数式用法，方便脚本与自动化：
 
+- onboard（北极星路径，一键上手）
+  - 作用：为新手固化“最短路径”，一次完成：
+    1) 保证 central 存在且包含预设所需服务（必要时自动创建/启用）
+    2) 将预设包下发到目标客户端（等价于 `mcp run --client ... --preset ... --yes`）
+    3) 可选本地化 npx 服务（加速启动）
+  - 示例：
+    - `mcp onboard`（交互式，默认推荐 Cursor 最小包）
+    - `mcp onboard --client cursor --yes`（非交互，一键下发 cursor-minimal）
+    - `mcp onboard --client claude --preset claude-basic --localize --yes`
+  - 关键参数：
+    - `--client`：目标客户端（cursor/claude/vscode-user/vscode-insiders/codex/...）
+    - `--preset`：预设场景包名称（默认按 client 推荐）
+    - `--localize`：下发前对所选 npx 服务执行一次本地化（写入 `~/.mcp-local`）
+    - `--dry-run`：仅预览差异，不写入
+    - `--yes`：自动确认写入
+
 - run（交互 / 非交互）
   - 交互模式：直接运行 `mcp run`，依提示选择客户端与服务集合；可选输入启动命令；直接回车仅落地不启动。
   - 非交互示例：
@@ -64,6 +82,7 @@ mcp check
   - 关键点：
     - 未带 `--client` 时：交互选择要清理的客户端（空行=全部）。
     - 带 `--client` 时：只针对指定客户端清理；如提供了未知客户端名称，会报错并不做任何修改（不会“退回到全部清理”）。
+    - Claude 额外清理：会同时清空 `~/.claude.json` 中所有 `projects.*.mcpServers`（项目级覆盖），避免“清不干净”的错觉。
     - 单槽备份 `.backup`，可用 `mcp undo` 回滚。
 
 - localize
@@ -73,6 +92,29 @@ mcp check
     - `--force`：无视已有安装记录，强制重装。
     - `--prune`：清理本地镜像目录 `~/.mcp-local`，不执行安装。
   - 说明：`mcp run --localize` 只针对“当前选择的服务”做一次性本地化；`mcp localize` 则是对 central 中所有 npx 服务做批量预热/升级。
+
+- doctor（聚合诊断，只读）
+  - 作用：一条命令汇总：
+    - central 是否存在/是否可校验
+    - central 体检建议（复用 `mcp central doctor` 的结论）
+    - 各目标端是否出现“unknown / central 已禁用但仍配置”的漂移
+  - 示例：
+    - `mcp doctor`
+    - `mcp doctor --client cursor`
+    - `mcp doctor --client claude --json`
+  - 关键参数：
+    - `--client`：指定要检查的客户端（可多次提供；claude 会展开为 file+registry）
+    - `--json`：JSON 输出（便于脚本/自动化）
+    - `--verbose`：输出更多细节
+
+- ui（本地 Web UI）
+  - 作用：用一个“列表 + 开关”的网页界面，实时把 central 的服务落地到目标客户端。
+  - 示例：
+    - `mcp ui`
+    - `mcp ui --port 0`（系统分配随机空闲端口；也是默认行为）
+    - `mcp ui --port 17821`（手动指定端口）
+  - 说明：
+    - UI 仅监听本机 `127.0.0.1`，并使用一次性 token 保护写操作；请使用终端输出的 URL 打开。
 
 ## 注意事项
 

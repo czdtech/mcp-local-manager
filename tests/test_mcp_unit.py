@@ -11,6 +11,7 @@ bin/mcp 内部函数的单元级测试：
 from __future__ import annotations
 
 import io
+import json
 import os
 import sys
 from pathlib import Path
@@ -87,3 +88,28 @@ def test_apply_json_map_dry_run(monkeypatch, tmp_path):
     out = buf.getvalue()
     assert 'DRY-RUN' in out
     assert 'Cursor' in out and 'mcp.json' in out
+
+
+def test_apply_json_map_droid_preserves_non_mcp_fields(tmp_path):
+    from mcp_cli.commands import run as RUN
+
+    path = Path(tmp_path) / '.factory' / 'mcp.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {"keep": {"a": 1}, "mcpServers": {"old": {"command": "x", "type": "stdio"}}},
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding='utf-8',
+    )
+
+    subset = {"filesystem": {"command": "npx", "args": ["-y", "mcp-server-filesystem@latest"]}}
+    rc = RUN.apply_json_map('Droid', path, subset, 'mcpServers', dry_run=False)
+    assert rc == 0
+
+    new_data = json.loads(path.read_text(encoding='utf-8'))
+    assert new_data.get("keep") == {"a": 1}
+    assert "filesystem" in (new_data.get("mcpServers") or {})
+    assert "old" not in (new_data.get("mcpServers") or {})
+    assert (path.with_name(path.name + ".backup")).exists()

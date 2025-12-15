@@ -65,6 +65,28 @@ class TestMCPCLI:
         # 选择默认客户端(回车=1)，选择默认服务(回车=第一个)，跳过启动(回车)
         result = subprocess.run([self.bin_path, 'run'], input='\n\n\n', capture_output=True, text=True, timeout=30)
         assert result.returncode in (0,1)
+
+    def test_mcp_onboard_help(self):
+        result = subprocess.run([self.bin_path, 'onboard', '--help'], capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0
+        assert 'onboard' in result.stdout
+
+    def test_mcp_onboard_dry_run_non_interactive(self):
+        # 一键模式：指定 client 后应可直接走默认 preset，不进入交互
+        result = subprocess.run(
+            [self.bin_path, 'onboard', '--client', 'cursor', '--yes', '--dry-run'],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0
+        assert '差异预览' in result.stdout or 'DRY-RUN' in result.stdout
+
+    def test_mcp_doctor_json_runs(self):
+        result = subprocess.run([self.bin_path, 'doctor', '--json'], capture_output=True, text=True, timeout=30)
+        assert result.returncode in (0, 1)
+        out = json.loads(result.stdout)
+        assert 'central' in out and 'targets' in out
     
     def test_mcp_invalid_command(self):
         """Test mcp with invalid command."""
@@ -282,6 +304,40 @@ class TestMCPIClear:
         
         assert result.returncode == 0
         assert '确认' not in result.stdout
+    
+    def test_clear_claude_project_overrides(self):
+        """Claude 项目级覆盖（~/.claude.json projects.*.mcpServers）应被清空且保留其它字段。"""
+        env = self._env()
+        p = Path(self.tmp_home) / '.claude.json'
+        p.write_text(
+            json.dumps(
+                {
+                    'projects': {
+                        'proj-a': {'mcpServers': {'filesystem': {'command': 'npx'}}, 'keep': 1},
+                        'proj-b': {'mcpServers': {}, 'other': True},
+                    },
+                    'otherTop': 'keep',
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding='utf-8',
+        )
+        result = subprocess.run(
+            [self.bin_path, 'clear', '--client', 'claude', '--yes'],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0
+
+        obj = json.loads(p.read_text(encoding='utf-8'))
+        assert obj['projects']['proj-a']['mcpServers'] == {}
+        assert obj['projects']['proj-a']['keep'] == 1
+        assert obj['projects']['proj-b']['mcpServers'] == {}
+        assert obj['otherTop'] == 'keep'
+        assert p.with_name(p.name + '.backup').exists()
 
     def test_clear_unknown_client_is_safe_noop(self):
         """未知 client 不应回退到“全部清理”，而是报错并不做任何修改。"""

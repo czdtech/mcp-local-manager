@@ -19,13 +19,16 @@ bash scripts/mcp-check.sh     # 只读健康检查
 ### CLI 命令（推荐日常使用）
 
 ```bash
-运行 `mcp run` / `mcp clear` / `mcp localize` / `mcp central` 进入交互式向导完成配置与管理；
-只读命令 `mcp status` / `mcp check` 直接输出结果。
+不想记命令：直接 `mcp ui`（Web 界面：列表 + 开关，实时落地）；
+新手：优先用 `mcp onboard` 一键上手；遇到问题先跑 `mcp doctor`；
+进阶：`mcp run` / `mcp clear` / `mcp localize` / `mcp central`；
+只读：`mcp status` / `mcp check`。
 ```
 
 ### 新手路径（场景包，数字即用）
-- `mcp run` → 选择客户端 → 选择预设包（回车=1 默认包，例如 Cursor/Claude/VS Code 基础：task-master-ai+context7）→ 确认落地。
-- 想要非交互：`mcp run --client cursor --preset cursor-minimal --yes`（可先 `--dry-run` 预览差异）。
+- `mcp onboard` → 选择客户端 → 选择预设包（回车=推荐默认包）→ 一次确认完成下发。
+- 想要非交互：`mcp onboard --client cursor --yes`（可先 `--dry-run` 预览差异）。
+- 诊断一把梭：`mcp doctor --client cursor`（central 是否健康、目标端是否漂移、下一步怎么做）。
 - 需要清空：`mcp clear --client claude`（或交互选择）；支持 `--dry-run` 预览、`--yes` 自动确认。
 - 加速启动：`mcp localize` 一键本地化 npx 服务，`--upgrade` 升级本地版本，`--prune` 清理本地镜像；也可以在单次下发时使用 `mcp run --localize ...` 只为本次选择的 npx 服务做本地安装。
 
@@ -37,10 +40,16 @@ bash scripts/mcp-check.sh     # 只读健康检查
 
 ```bash
 # 仅为 Cursor 启用 context7 + task-master-ai，其它 CLI/IDE 保持"裸奔"
-bash scripts/onboard-cursor-minimal.sh
+mcp onboard --client cursor --yes
 # 复验：
 mcp status cursor
 ```
+
+更多文档：
+- `docs/README.md`：文档索引（先看这个）
+- `docs/QUICKSTART.md`：北极星路径（新手只看这个）
+- `docs/mcp.md`：命令参考（全量选项）
+- `docs/troubleshooting-mcp.md`：故障排查与最佳实践
 
 ## 核心理念
 
@@ -48,6 +57,8 @@ mcp status cursor
 - **仅改 MCP 段**：不同目标只写入各自 MCP 部分（如 Codex 的 \`[mcp_servers.*]\`、Gemini 的 \`mcpServers\` 等），不触碰其它设置
 - **Claude**：文件为主（\`~/.claude/settings.json\`），命令兜底仅补"缺失项"
 - **默认全部启用**：清单里未显式写 \`enabled: false\` 的服务都视为启用；是否真正"加载"，由你对某个 CLI/IDE 的落地选择决定
+  - 行为约束：\`mcp run\` 仅允许下发“已启用”的服务；\`enabled: false\` 的条目会被跳过/拒绝（需先在 central 启用）
+  - 状态基线：\`mcp status\` 的 on/off 以“已启用”集合为基线；若目标端仍配置了 central 已禁用的服务，会提示告警
 - **安装默认不落地**：\`scripts/install-mac.sh\` 不会执行同步，需使用 \`mcp\` 按需选择后落地
 
 ## 推荐基线
@@ -188,7 +199,7 @@ pytest -v
 pytest tests/test_validation.py -v
 ```
 
-注意：本项目不启用任何线上 CI（如 GitHub Actions）。默认策略是“本地验证通过即可直接推送”。如需团队内约定的额外校验，请在本地脚本中完成，而不是依赖远端流水线。
+注意：本项目已提供最小 GitHub Actions CI（ruff/black/pytest），但仍建议你在本地跑一遍 `pytest -q` 作为最终确认。
 
 ## 故障排查
 

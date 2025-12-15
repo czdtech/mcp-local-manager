@@ -37,7 +37,7 @@
 - 脚本：`scripts/install-mac.sh` 去除 `mcp-auto-sync.py sync` 调用，新增明确提示“安装默认不落地 MCP，需用户自行选择 via mcp”。保留 npx 预热为可选步骤。
 - 文档：
   - `README.md` 更新快速使用与目录说明，强调按需落地与最小化启用；`onboard-cursor-minimal.sh` 标注为“可选”。
-  - `docs/QUICKSTART-mac.md` 移除“执行同步”表述，明确安装脚本不落地。
+  - `docs/QUICKSTART.md` 强调安装脚本不落地，需按需使用 `mcp` 选择后下发。
   - `docs/troubleshooting-mcp.md` 说明“默认不自动同步”，保留 `mcp-sync.sh` 作为可选路径。
 - CLI 交互化：配置/管理能力改为交互模式；全局 `-n/--dry-run` 已移除，预览与确认在交互步骤中完成，需要预览时使用子命令级 `--dry-run`（如 `mcp run --dry-run` / `mcp clear --dry-run`）。
  - 新增别名：已移除（统一使用 `mcp`）。
