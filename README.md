@@ -97,13 +97,31 @@ mcp-local-manager/
 ### 首次安装
 
 ```bash
+# 1. 克隆项目
+git clone <repository-url>
+cd mcp-local-manager
+
+# 2. 运行安装脚本
 bash scripts/install-mac.sh
+
+# 3. 配置 PATH（二选一）
+# 方式 A：添加到 shell 配置文件（推荐）
+echo "export PATH=\"$(pwd)/bin:\$PATH\"" >> ~/.zshrc
+source ~/.zshrc
+
+# 方式 B：创建全局符号链接
+sudo ln -sf "$(pwd)/bin/mcp" /usr/local/bin/mcp
+
+# 4. 验证安装
+mcp --help
 ```
 
 脚本会自动：
 - 生成/更新统一清单（不对各客户端落地）
 - 可选预热 npx 缓存（减少首次拉包失败）
 - 运行轻量体检（检查关键路径与配置文件存在性）；如需深度体检（连通性探测等），请执行 `scripts/mcp-check.sh`
+
+**注意**：如果你将项目克隆到其他位置，请将上述 PATH 中的路径替换为实际的项目路径。
 
 ### 统一清单位置
 
