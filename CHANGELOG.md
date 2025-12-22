@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.6 (2025-12-22)
+
+- 文档：完善 README 安装说明，添加详细的 4 步安装流程（克隆、运行脚本、配置 PATH、验证安装）
+
 ## v1.3.5 (2025-11-27)
 
 - 破坏性变更：移除旧版 `mcp pick` 子命令，统一通过 `mcp run`/`mcp central`/`mcp status`/`mcp check`/`mcp undo` 管理配置。
