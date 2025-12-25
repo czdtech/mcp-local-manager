@@ -295,12 +295,12 @@ def apply_json_map(
         obj["mcpServers"] = servers_config
     elif top_key == "servers":
         obj["servers"] = {
-            name: U.to_target_server_info(info or {}, client="gemini" if label == "Gemini" else None) 
+            name: U.to_target_server_info(info or {}, client="gemini" if label == "Gemini" else "iflow" if label == "iFlow" else None) 
             for name, info in (subset or {}).items()
         }
     else:
         obj[top_key] = {
-            name: U.to_target_server_info(info or {}, client="gemini" if label == "Gemini" else None) 
+            name: U.to_target_server_info(info or {}, client="gemini" if label == "Gemini" else "iflow" if label == "iFlow" else None) 
             for name, info in (subset or {}).items()
         }
         if label == "Gemini":

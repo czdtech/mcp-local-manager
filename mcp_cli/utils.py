@@ -292,8 +292,8 @@ def to_target_server_info(info: dict[str, Any], client: str | None = None) -> di
     if url:
         out["url"] = str(url)
 
-    # Gemini CLI 不支持 type 字段，其他客户端可以保留
-    if client != "gemini":
+    # Gemini CLI 和 iFlow CLI 不支持 type 字段，其他客户端可以保留
+    if client not in ("gemini", "iflow"):
         server_type = info.get("type")
         if server_type:
             out["type"] = str(server_type)
