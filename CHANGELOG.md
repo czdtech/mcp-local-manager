@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.9 (2025-12-25)
+
+- 配置：移除 `寸止` 服务器配置
+- 配置：新增 `augment-context-engine` 服务器配置（需要用户自行安装 auggie 工具）
+- 文档：更新 README.md，在"推荐基线"部分添加 `augment-context-engine` 的安装说明与注意事项
+
 ## v1.3.6 (2025-12-22)
 
 - 文档：完善 README 安装说明，添加详细的 4 步安装流程（克隆、运行脚本、配置 PATH、验证安装）
