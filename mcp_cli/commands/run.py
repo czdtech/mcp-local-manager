@@ -153,7 +153,7 @@ def _strip_npx_args(cmd: str, args: list[str]) -> list[str]:
     return list(args[i:])
 
 
-def _apply_local_override(subset: dict) -> dict:
+def _apply_local_override(subset: dict, client: str | None = None) -> dict:
     """若存在本地化记录，优先使用本地路径；失败回退原值。"""
     resolved = _load_local_resolved()
     if not resolved:
@@ -170,9 +170,11 @@ def _apply_local_override(subset: dict) -> dict:
                 new_info["command"] = path
                 # 对 npx 迁移：去掉 npx 自身参数与包名，仅保留真正 CLI 参数
                 new_info["args"] = _strip_npx_args(orig_cmd, orig_args)
-                out[name] = new_info
+                # 应用客户端特定的字段清理
+                out[name] = U.to_target_server_info(new_info, client=client)
                 continue
-        out[name] = info
+        # 应用客户端特定的字段清理
+        out[name] = U.to_target_server_info(info, client=client)
     return out
 
 
@@ -293,11 +295,13 @@ def apply_json_map(
         obj["mcpServers"] = servers_config
     elif top_key == "servers":
         obj["servers"] = {
-            name: U.to_target_server_info(info or {}) for name, info in (subset or {}).items()
+            name: U.to_target_server_info(info or {}, client="gemini" if label == "Gemini" else None) 
+            for name, info in (subset or {}).items()
         }
     else:
         obj[top_key] = {
-            name: U.to_target_server_info(info or {}) for name, info in (subset or {}).items()
+            name: U.to_target_server_info(info or {}, client="gemini" if label == "Gemini" else None) 
+            for name, info in (subset or {}).items()
         }
         if label == "Gemini":
             obj.setdefault("mcp", {})["allowed"] = sorted((subset or {}).keys())
@@ -548,7 +552,7 @@ def run(args) -> int:
 
     # 尝试应用本地化覆盖，再按需回退到中央清单定义
     original_subset = subset
-    subset = _apply_local_override(subset)
+    subset = _apply_local_override(subset, client=client)
     subset = _fallback_to_original(subset, original_subset)
 
     if (preselected or dry_run) and client and subset:

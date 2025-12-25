@@ -298,7 +298,7 @@ def _read_target_entry(client: str, name: str) -> dict[str, Any]:
 def import_to_central(client: str, name: str) -> dict[str, Any]:
     """将目标端已有条目收录到 central，并加上来源标记。"""
     raw = _read_target_entry(client, name)
-    entry = U.to_target_server_info(raw)
+    entry = U.to_target_server_info(raw, client=client)
     if not entry.get("command"):
         raise ValueError("目标端条目缺少 command，无法收录到 central")
 
@@ -346,7 +346,7 @@ def set_central_enabled(name: str, enabled: bool) -> dict[str, Any]:
     return {"name": name, "enabled": bool(enabled)}
 
 
-def _build_server_info_from_central(central_servers: dict[str, Any], name: str) -> dict[str, Any]:
+def _build_server_info_from_central(central_servers: dict[str, Any], name: str, client: str | None = None) -> dict[str, Any]:
     if name not in central_servers:
         raise KeyError(f"central 未收录: {name}")
     info = central_servers.get(name) or {}
@@ -354,7 +354,7 @@ def _build_server_info_from_central(central_servers: dict[str, Any], name: str) 
         raise ValueError(f"central 配置非法（必须是对象）: {name}")
     subset = {name: deepcopy(info)}
     original = deepcopy(subset)
-    subset = RUN._apply_local_override(subset)  # noqa: SLF001
+    subset = RUN._apply_local_override(subset, client=client)  # noqa: SLF001
     subset = RUN._fallback_to_original(subset, original)  # noqa: SLF001
     return subset[name]
 
@@ -454,7 +454,7 @@ def _codex_strip_server_tables(text: str, name: str) -> str:
 
 def _codex_render_server_block(name: str, info: dict[str, Any]) -> str:
     """渲染单个 Codex server 的 TOML 段落（追加到文件末尾）。"""
-    info = U.to_target_server_info(info or {})
+    info = U.to_target_server_info(info or {}, client="codex")
     name = str(name)
 
     timeout = info.get("timeout")
@@ -625,7 +625,7 @@ def apply_toggle(client: str, name: str, on: bool) -> dict[str, Any]:
     if on:
         if name in disabled_names:
             raise ValueError(f"此服务在 central 已禁用（enabled:false）：{name}。请先启用再落地。")
-        info = _build_server_info_from_central(servers_all, name)
+        info = _build_server_info_from_central(servers_all, name, client=client)
 
     notes: list[str] = []
     with _WRITE_LOCK:
@@ -648,7 +648,7 @@ def apply_toggle(client: str, name: str, on: bool) -> dict[str, Any]:
             if on or p.exists():
                 obj, mp = _load_json_map(p, "mcpServers")
                 if on:
-                    mp[name] = U.to_target_server_info(info or {})
+                    mp[name] = U.to_target_server_info(info or {}, client="claude")
                     changed = True
                 else:
                     if name in mp:
@@ -666,7 +666,7 @@ def apply_toggle(client: str, name: str, on: bool) -> dict[str, Any]:
             if on or p.exists():
                 obj, mp = _load_json_map(p, "mcpServers")
                 if on:
-                    mp[name] = U.to_target_server_info(info or {})
+                    mp[name] = U.to_target_server_info(info or {}, client="cursor")
                     changed = True
                 else:
                     if name in mp:
@@ -684,7 +684,7 @@ def apply_toggle(client: str, name: str, on: bool) -> dict[str, Any]:
                 obj, mp = _load_json_map(p, "mcpServers")
                 before_allowed = list((obj.get("mcp") or {}).get("allowed") or [])
                 if on:
-                    mp[name] = U.to_target_server_info(info or {})
+                    mp[name] = U.to_target_server_info(info or {}, client="gemini")
                     changed = True
                 else:
                     if name in mp:
@@ -704,7 +704,7 @@ def apply_toggle(client: str, name: str, on: bool) -> dict[str, Any]:
             if on or p.exists():
                 obj, mp = _load_json_map(p, "mcpServers")
                 if on:
-                    mp[name] = U.to_target_server_info(info or {})
+                    mp[name] = U.to_target_server_info(info or {}, client="iflow")
                     changed = True
                 else:
                     if name in mp:
@@ -739,7 +739,7 @@ def apply_toggle(client: str, name: str, on: bool) -> dict[str, Any]:
             if on or p.exists():
                 obj, mp = _load_json_map(p, "servers")
                 if on:
-                    mp[name] = U.to_target_server_info(info or {})
+                    mp[name] = U.to_target_server_info(info or {}, client="vscode-user")
                     changed = True
                 else:
                     if name in mp:
@@ -756,7 +756,7 @@ def apply_toggle(client: str, name: str, on: bool) -> dict[str, Any]:
             if on or p.exists():
                 obj, mp = _load_json_map(p, "servers")
                 if on:
-                    mp[name] = U.to_target_server_info(info or {})
+                    mp[name] = U.to_target_server_info(info or {}, client="vscode-insiders")
                     changed = True
                 else:
                     if name in mp:

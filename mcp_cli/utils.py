@@ -263,10 +263,11 @@ def split_enabled_servers(servers: dict[str, Any]) -> tuple[dict[str, Any], dict
     return enabled, disabled
 
 
-def to_target_server_info(info: dict[str, Any]) -> dict[str, Any]:
+def to_target_server_info(info: dict[str, Any], client: str | None = None) -> dict[str, Any]:
     """将 central 的 server 配置裁剪为“可写入目标端”的形态（去除元数据字段）。
 
-    目标端通常只需要：command/args/env/timeout/url/headers/type。
+    目标端通常只需要：command/args/env/timeout/url/headers。
+    对于 Gemini 客户端，会额外移除 type 字段（因为 Gemini CLI 不支持）。
     """
     if not isinstance(info, dict):
         return {}
@@ -291,9 +292,11 @@ def to_target_server_info(info: dict[str, Any]) -> dict[str, Any]:
     if url:
         out["url"] = str(url)
 
-    server_type = info.get("type")
-    if server_type:
-        out["type"] = str(server_type)
+    # Gemini CLI 不支持 type 字段，其他客户端可以保留
+    if client != "gemini":
+        server_type = info.get("type")
+        if server_type:
+            out["type"] = str(server_type)
 
     timeout = info.get("timeout")
     if timeout is not None:
