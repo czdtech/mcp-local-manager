@@ -264,13 +264,23 @@ def split_enabled_servers(servers: dict[str, Any]) -> tuple[dict[str, Any], dict
 
 
 def to_target_server_info(info: dict[str, Any], client: str | None = None) -> dict[str, Any]:
-    """将 central 的 server 配置裁剪为“可写入目标端”的形态（去除元数据字段）。
+    """将 central 的 server 配置裁剪为"可写入目标端"的形态（去除元数据字段）。
 
     目标端通常只需要：command/args/env/timeout/url/headers。
     对于 Gemini 客户端，会额外移除 type 字段（因为 Gemini CLI 不支持）。
+
+    支持 client_overrides 字段：当指定 client 时，会用对应的覆盖配置合并默认配置。
     """
     if not isinstance(info, dict):
         return {}
+
+    # 应用 client_overrides（如果存在）
+    overrides = info.get("client_overrides", {})
+    if client and isinstance(overrides, dict) and client in overrides:
+        override = overrides[client]
+        if isinstance(override, dict):
+            # 合并：override 中的字段覆盖默认值
+            info = {**info, **override}
 
     out: dict[str, Any] = {}
     if "command" in info and info.get("command"):
@@ -292,11 +302,39 @@ def to_target_server_info(info: dict[str, Any], client: str | None = None) -> di
     if url:
         out["url"] = str(url)
 
-    # Gemini CLI 和 iFlow CLI 不支持 type 字段，其他客户端可以保留
+    def _map_type_for_client(server_type: object, target: str | None) -> str | None:
+        """不同 MCP 客户端对 type 字段的取值不完全一致：
+
+        - Cursor 文档示例使用 `local` 表示本地进程（stdio）。
+        - Claude / VS Code 文档示例使用 `stdio`。
+        """
+        # 仅在 central 显式提供 type 时才做映射；否则保持“不写 type”（避免误把远端/SSE 配置写成 stdio/local）。
+        if server_type is None:
+            return None
+        t = str(server_type).strip().lower()
+        if not t:
+            return None
+        c = str(target or "").strip().lower()
+
+        # Cursor：优先写 local；若 central 写了 stdio，也做兼容映射
+        if c == "cursor":
+            if t == "stdio":
+                return "local"
+            return t
+
+        # Claude / VS Code：优先写 stdio；若 central 写了 local，也做兼容映射
+        if c in ("claude", "claude-file", "claude-reg", "vscode-user", "vscode-insiders", "vscode-ins"):
+            if t == "local":
+                return "stdio"
+            return t
+
+        return t or None
+
+    # Gemini CLI 和 iFlow CLI 不支持 type 字段
     if client not in ("gemini", "iflow"):
-        server_type = info.get("type")
-        if server_type:
-            out["type"] = str(server_type)
+        mapped = _map_type_for_client(info.get("type"), client)
+        if mapped:
+            out["type"] = mapped
 
     timeout = info.get("timeout")
     if timeout is not None:

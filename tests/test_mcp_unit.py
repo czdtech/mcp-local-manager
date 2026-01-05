@@ -113,3 +113,65 @@ def test_apply_json_map_droid_preserves_non_mcp_fields(tmp_path):
     assert "filesystem" in (new_data.get("mcpServers") or {})
     assert "old" not in (new_data.get("mcpServers") or {})
     assert (path.with_name(path.name + ".backup")).exists()
+
+
+def test_to_target_server_info_client_overrides():
+    """测试 client_overrides 字段的覆盖逻辑。"""
+    from mcp_cli import utils as U
+
+    info = {
+        "command": "auggie",
+        "args": ["--mcp"],
+        "type": "stdio",
+        "enabled": True,
+        "client_overrides": {
+            "cursor": {
+                "command": "bash",
+                "args": ["-c", "auggie --mcp -w \"${WORKSPACE_FOLDER_PATHS}\""],
+            },
+            "kiro": {"args": ["--mcp", "-w", "./"]},
+        },
+    }
+
+    # 默认配置（无 client）
+    out = U.to_target_server_info(info)
+    assert out["command"] == "auggie"
+    assert out["args"] == ["--mcp"]
+
+    # Claude Code 使用默认配置
+    out = U.to_target_server_info(info, client="claude-file")
+    assert out["command"] == "auggie"
+    assert out["args"] == ["--mcp"]
+
+    # Cursor 使用覆盖配置
+    out = U.to_target_server_info(info, client="cursor")
+    assert out["command"] == "bash"
+    assert "-c" in out["args"]
+
+    # Kiro 只覆盖 args
+    out = U.to_target_server_info(info, client="kiro")
+    assert out["command"] == "auggie"  # 保留默认
+    assert out["args"] == ["--mcp", "-w", "./"]  # 被覆盖
+
+
+def test_to_target_server_info_type_mapping():
+    """不同客户端对 type 的取值不一致：Cursor=local，Claude/VS Code=stdio。"""
+    from mcp_cli import utils as U
+
+    info_stdio = {"command": "auggie", "args": ["--mcp"], "type": "stdio"}
+    assert U.to_target_server_info(info_stdio, client="cursor").get("type") == "local"
+
+    info_local = {"command": "npx", "args": ["-y", "pkg@latest"], "type": "local"}
+    assert U.to_target_server_info(info_local, client="claude").get("type") == "stdio"
+    assert U.to_target_server_info(info_local, client="vscode-user").get("type") == "stdio"
+
+
+def test_to_target_server_info_does_not_force_type_when_omitted():
+    """当 central 未显式提供 type 时，不应为不同客户端强行补默认 type。"""
+    from mcp_cli import utils as U
+
+    info_remote_like = {"command": "x", "url": "https://example.com/mcp"}
+
+    assert "type" not in U.to_target_server_info(info_remote_like, client="cursor")
+    assert "type" not in U.to_target_server_info(info_remote_like, client="vscode-user")
+    assert "type" not in U.to_target_server_info(info_remote_like, client="claude-file")

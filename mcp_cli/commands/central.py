@@ -68,25 +68,23 @@ def _validate(obj: dict[str, Any]) -> tuple[bool, str]:
     except Exception as e:
         return False, f"配置无法序列化为 JSON: {e}"
 
-    # 1) 基础内容校验：优先复用 mcp_validation（若可用），否则做最小兜底校验
+    # 1) 基础内容校验（不依赖 jsonschema / mcp_validation），确保缺少依赖时也不会放过明显错误
     try:
-        from mcp_validation import validate_central_config_format
+        if not isinstance(data, dict):
+            raise ValueError("配置必须是对象格式")
+        for k in ("version", "description", "servers"):
+            if k not in data:
+                raise ValueError(f"缺少必需字段: '{k}'")
+        if not isinstance(data.get("version"), str) or not str(data.get("version")).strip():
+            raise ValueError("'version' 字段必须是非空字符串")
+        if not isinstance(data.get("description"), str) or not str(data.get("description")).strip():
+            raise ValueError("'description' 字段必须是非空字符串")
+        if not isinstance(data.get("servers"), dict):
+            raise ValueError("'servers' 字段必须是对象格式")
+    except Exception as e:
+        return False, str(e)
 
-        validate_central_config_format(data)
-    except Exception:
-        # 兜底：仅做最小结构校验（缺失字段/类型错误）
-        try:
-            if not isinstance(data, dict):
-                raise ValueError("配置必须是对象格式")
-            for k in ("version", "description", "servers"):
-                if k not in data:
-                    raise ValueError(f"缺少必需字段: '{k}'")
-            if not isinstance(data.get("servers"), dict):
-                raise ValueError("'servers' 字段必须是对象格式")
-        except Exception as e:
-            return False, str(e)
-
-    # 2) 额外字段（additionalProperties=false）校验：即使没有 jsonschema 也能拦截明显错误
+    # 2) 额外字段（additionalProperties=false）与关键字段类型校验（覆盖 schema 里的主要约束）
     allowed_top = {"version", "description", "servers"}
     allowed_server = {
         "enabled",
@@ -98,13 +96,12 @@ def _validate(obj: dict[str, Any]) -> tuple[bool, str]:
         "timeout",
         "headers",
         "source",
+        "client_overrides",
     }
     extra_top = set(data.keys()) - allowed_top
     if extra_top:
         return False, f"不允许的顶层字段: {sorted(extra_top)}"
-    servers = data.get("servers") or {}
-    if not isinstance(servers, dict):
-        return False, "'servers' 字段必须是对象格式"
+    servers: dict[str, Any] = data.get("servers") or {}
     for name, info in servers.items():
         if not isinstance(info, dict):
             return False, f"服务器 '{name}' 配置必须是对象格式"
@@ -112,22 +109,107 @@ def _validate(obj: dict[str, Any]) -> tuple[bool, str]:
         if extra:
             return False, f"服务器 '{name}' 包含不支持的字段: {sorted(extra)}"
 
+        cmd = info.get("command")
+        if not isinstance(cmd, str) or not cmd.strip():
+            return False, f"服务器 '{name}' 缺少必需字段: 'command'"
+
+        if "enabled" in info and not isinstance(info.get("enabled"), bool):
+            return False, f"服务器 '{name}' 的 'enabled' 必须是布尔值"
+
+        if "type" in info:
+            v = info.get("type")
+            if not isinstance(v, str) or not v.strip():
+                return False, f"服务器 '{name}' 的 'type' 必须是非空字符串"
+
+        if "args" in info:
+            args = info.get("args")
+            if not isinstance(args, list):
+                return False, f"服务器 '{name}' 的 'args' 必须是数组"
+            for i, arg in enumerate(args):
+                if not isinstance(arg, str):
+                    return False, f"服务器 '{name}' 的 'args[{i}]' 必须是字符串"
+
+        if "env" in info:
+            env = info.get("env")
+            if not isinstance(env, dict):
+                return False, f"服务器 '{name}' 的 'env' 必须是对象"
+            for k, v in env.items():
+                if not isinstance(v, str):
+                    return False, f"服务器 '{name}' 的环境变量 '{k}' 必须是字符串"
+
+        if "url" in info:
+            url = info.get("url")
+            if not isinstance(url, str) or not url.strip():
+                return False, f"服务器 '{name}' 的 'url' 必须是非空字符串"
+
+        if "timeout" in info:
+            timeout = info.get("timeout")
+            if isinstance(timeout, bool) or not isinstance(timeout, int):
+                return False, f"服务器 '{name}' 的 'timeout' 必须是整数（秒）"
+            if timeout < 1 or timeout > 3600:
+                return False, f"服务器 '{name}' 的 'timeout' 超出范围（1-3600）: {timeout}"
+
+        if "headers" in info:
+            headers = info.get("headers")
+            if not isinstance(headers, dict):
+                return False, f"服务器 '{name}' 的 'headers' 必须是对象"
+            for k, v in headers.items():
+                if not isinstance(v, str):
+                    return False, f"服务器 '{name}' 的 HTTP 头 '{k}' 必须是字符串"
+
+        if "source" in info:
+            source = info.get("source")
+            if not isinstance(source, str) or not source.strip():
+                return False, f"服务器 '{name}' 的 'source' 必须是非空字符串"
+
+        if "client_overrides" in info:
+            overrides = info.get("client_overrides")
+            if not isinstance(overrides, dict):
+                return False, f"服务器 '{name}' 的 'client_overrides' 必须是对象"
+            for client, override in overrides.items():
+                if not isinstance(override, dict):
+                    return False, f"服务器 '{name}' 的 client_overrides.{client} 必须是对象"
+                if "command" in override:
+                    v = override.get("command")
+                    if not isinstance(v, str) or not v.strip():
+                        return False, f"服务器 '{name}' 的 client_overrides.{client}.command 必须是非空字符串"
+                if "args" in override:
+                    args = override.get("args")
+                    if not isinstance(args, list):
+                        return False, f"服务器 '{name}' 的 client_overrides.{client}.args 必须是数组"
+                    for i, arg in enumerate(args):
+                        if not isinstance(arg, str):
+                            return False, f"服务器 '{name}' 的 client_overrides.{client}.args[{i}] 必须是字符串"
+                if "env" in override:
+                    env = override.get("env")
+                    if not isinstance(env, dict):
+                        return False, f"服务器 '{name}' 的 client_overrides.{client}.env 必须是对象"
+                    for k, v in env.items():
+                        if not isinstance(v, str):
+                            return False, (
+                                f"服务器 '{name}' 的 client_overrides.{client} 环境变量 '{k}' 必须是字符串"
+                            )
+
     # 3) 若 jsonschema 可用，则执行完整 schema 校验（更精确的类型/范围校验）
     # 注意：mcp_validation 在 CLI 场景可用（bin 目录），但库/测试环境不一定可 import。
     schema_path = Path(__file__).resolve().parents[2] / "config" / "mcp-servers.schema.json"
     if schema_path.exists():
         try:
             import jsonschema
-
-            schema = json.loads(schema_path.read_text(encoding="utf-8"))
-            jsonschema.validate(instance=data, schema=schema)
-        except Exception as e:
+        except ImportError:
+            # jsonschema 不可用：上面的手工校验已覆盖 schema 的关键约束，避免“静默跳过导致写入脏配置”。
+            pass
+        else:
             try:
-                from mcp_validation import format_validation_error
+                schema = json.loads(schema_path.read_text(encoding="utf-8"))
+                jsonschema.validate(instance=data, schema=schema)
+            except Exception as e:
+                try:
+                    from mcp_validation import format_validation_error
 
-                return False, format_validation_error(e)
-            except Exception:
-                return False, str(e)
+                    return False, format_validation_error(e)
+                except Exception:
+                    return False, str(e)
 
     return True, "ok"
 

@@ -249,6 +249,7 @@ def apply_codex(subset: dict, dry_run: bool = False) -> int:
         if timeout_sec < 1:
             timeout_sec = 60
         lines.append(f"startup_timeout_sec = {timeout_sec}")
+        lines.append(f"tool_timeout_sec = {timeout_sec}")
         lines.append(f"command = \"{info.get('command','')}\"")
         args = info.get("args") or []
         if args:
@@ -294,13 +295,15 @@ def apply_json_map(
             servers_config[name] = server_config
         obj["mcpServers"] = servers_config
     elif top_key == "servers":
+        client_type = "gemini" if label == "Gemini" else "iflow" if label == "iFlow" else None
         obj["servers"] = {
-            name: U.to_target_server_info(info or {}, client="gemini" if label == "Gemini" else "iflow" if label == "iFlow" else None) 
+            name: U.to_target_server_info(info or {}, client=client_type)
             for name, info in (subset or {}).items()
         }
     else:
+        client_type = "gemini" if label == "Gemini" else "iflow" if label == "iFlow" else None
         obj[top_key] = {
-            name: U.to_target_server_info(info or {}, client="gemini" if label == "Gemini" else "iflow" if label == "iFlow" else None) 
+            name: U.to_target_server_info(info or {}, client=client_type)
             for name, info in (subset or {}).items()
         }
         if label == "Gemini":

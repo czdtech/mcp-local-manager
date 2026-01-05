@@ -346,7 +346,9 @@ def set_central_enabled(name: str, enabled: bool) -> dict[str, Any]:
     return {"name": name, "enabled": bool(enabled)}
 
 
-def _build_server_info_from_central(central_servers: dict[str, Any], name: str, client: str | None = None) -> dict[str, Any]:
+def _build_server_info_from_central(
+    central_servers: dict[str, Any], name: str, client: str | None = None
+) -> dict[str, Any]:
     if name not in central_servers:
         raise KeyError(f"central 未收录: {name}")
     info = central_servers.get(name) or {}
@@ -473,6 +475,7 @@ def _codex_render_server_block(name: str, info: dict[str, Any]) -> str:
     lines.append(f"\n# === MCP Server: {name} (由 MCP Local Manager 生成) ===")
     lines.append(f"[mcp_servers.{name}]")
     lines.append(f"startup_timeout_sec = {timeout_sec}")
+    lines.append(f"tool_timeout_sec = {timeout_sec}")
     lines.append("command = " + json.dumps(cmd))
     if isinstance(args, list) and args:
         lines.append("args = " + json.dumps([str(x) for x in args]))

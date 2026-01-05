@@ -74,6 +74,19 @@
             "type": "string",
             "description": "Metadata: where this entry came from (e.g., imported:cursor)",
             "minLength": 1
+          },
+          "client_overrides": {
+            "type": "object",
+            "description": "Per-client configuration overrides (e.g., cursor, vscode-user)",
+            "additionalProperties": {
+              "type": "object",
+              "description": "Override configuration for a specific client",
+              "properties": {
+                "command": { "type": "string" },
+                "args": { "type": "array", "items": { "type": "string" } },
+                "env": { "type": "object", "additionalProperties": { "type": "string" } }
+              }
+            }
           }
         },
         "additionalProperties": false

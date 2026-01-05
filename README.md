@@ -65,7 +65,7 @@ mcp status cursor
 
 - Node 生态 MCP 一律使用 \`npx -y <package>@latest\`，便于获得上游修复（如 \`task-master-ai\`）
 - 仅 \`serena\` 走本地二进制（\`~/.local/bin/serena\`）
-- \`augment-context-engine\` 需要用户自行安装 \`auggie\` 命令行工具（https://github.com/augmentcode/augment-context-engine），否则运行时将报错
+- \`augment-context-engine\` 需要用户自行安装 \`auggie\` 命令行工具（https://github.com/augmentcode/augment-context-engine），并建议在 central 使用 \`client_overrides\` 为 Cursor 注入 \`WORKSPACE_FOLDER_PATHS\`（见 \`config/mcp-servers.sample.json\`）
 - 日常建议：仅对 Cursor 落地所需 MCP，其他 CLI/IDE 保持"裸奔"
 - 混合策略：默认优先 npx；若某客户端（如 Gemini）对某个服务（如 \`task-master-ai\`）不稳定，则改为"全局二进制直连"（\`npm i -g <pkg>@latest\`，\`command\` 改为该二进制）
 

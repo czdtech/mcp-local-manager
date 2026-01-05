@@ -56,8 +56,21 @@
     "augment-context-engine": {
       "enabled": true,
       "type": "stdio",
-      "command": "bash",
-      "args": ["-c","auggie --mcp -m default -w \"${WORKSPACE_FOLDER_PATHS%%,*}\""]
+      "command": "auggie",
+      "args": ["--mcp"],
+      "timeout": 300,
+      "client_overrides": {
+        "cursor": {
+          "command": "bash",
+          "args": ["-c", "auggie --mcp -m default -w \"${WORKSPACE_FOLDER_PATHS%%,*}\""]
+        },
+        "vscode-user": {
+          "args": ["--mcp", "-m", "default"]
+        },
+        "vscode-insiders": {
+          "args": ["--mcp", "-m", "default"]
+        }
+      }
     }
   }
 }

@@ -11,6 +11,16 @@ from pathlib import Path
 import time
 import logging
 
+# 复用主 CLI 的 per-client 映射逻辑（client_overrides / type 映射 / timeout 过滤）。
+# 兼容脚本从任意目录运行：将仓库根目录加入 sys.path，避免 import 失败。
+try:
+    _REPO_ROOT = Path(__file__).resolve().parents[1]
+    if str(_REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(_REPO_ROOT))
+    from mcp_cli import utils as _CLI_U  # type: ignore
+except Exception:
+    _CLI_U = None
+
 try:
     from mcp_validation import (
         validate_mcp_servers_config, 
@@ -120,6 +130,15 @@ def _expand_cmd_args(info: dict):
         args.append(_expand_tilde(a))
     return cmd, args
 
+def _to_target(info: dict, client: str | None) -> dict:
+    """应用 central 的 client_overrides + type 映射（若可用）。"""
+    if _CLI_U is None:
+        return info or {}
+    try:
+        return _CLI_U.to_target_server_info(info or {}, client=client)
+    except Exception:
+        return info or {}
+
 def sync_codex():
     # 注意：使用单次 Path 拼接，便于测试中对 HOME 的 MagicMock 打桩
     p = HOME/'.codex/config.toml'
@@ -132,8 +151,17 @@ def sync_codex():
     for name,info in SERVERS.items():
         if not info.get('enabled', True):
             continue
+        info = _to_target(info or {}, client="codex")
         lines.append(f"\n[mcp_servers.{name}]")
-        lines.append("startup_timeout_sec = 60")
+        timeout = (info or {}).get("timeout")
+        try:
+            timeout_sec = int(timeout) if timeout is not None else 60
+        except Exception:
+            timeout_sec = 60
+        if timeout_sec < 1:
+            timeout_sec = 60
+        lines.append(f"startup_timeout_sec = {timeout_sec}")
+        lines.append(f"tool_timeout_sec = {timeout_sec}")
         cmd, args = _expand_cmd_args(info)
         lines.append(f"command = \"{cmd}\"")
         if args:
@@ -193,15 +221,20 @@ def write_json_with_retry(path: Path, obj: dict, label: str = "", max_retries: i
             log_ok(f'配置已更新: {path}')
     return success
 
-def build_mcpServers():
+def build_mcpServers(client: str | None = None):
     out = {}
     for name,info in SERVERS.items():
-        if not info.get('enabled', True):
+        if not (info or {}).get('enabled', True):
             continue
+        mapped = _to_target(info or {}, client=client)
         entry = {}
-        for k in ('command','args','env','url','headers','type'):
-            if k in info and info[k] not in (None, {} , []):
-                entry[k] = info[k]
+        for k in ('command','args','env','url','headers','type','timeout'):
+            if k in mapped and mapped[k] not in (None, {} , []):
+                entry[k] = mapped[k]
+
+        if client == "droid":
+            entry["type"] = "stdio"
+
         if 'command' in entry:
             entry['command'] = _expand_tilde(entry['command'])
         if 'args' in entry and isinstance(entry['args'], list):
@@ -209,7 +242,7 @@ def build_mcpServers():
         out[name]=entry
     return out
 
-def sync_json_map(label, p: Path, key='mcpServers', allowed=False):
+def sync_json_map(label, p: Path, key='mcpServers', allowed=False, key_client: str | None = None):
     obj = {}
     if p.exists():
         try:
@@ -226,41 +259,49 @@ def sync_json_map(label, p: Path, key='mcpServers', allowed=False):
         except Exception as e:
             log_warn(f'{label} 读取失败，将重写: {e}')
             obj = {}
-    obj[key] = build_mcpServers()
+    obj[key] = build_mcpServers(client=key_client)
     if allowed:
         obj.setdefault('mcp', {})['allowed'] = sorted(obj[key].keys())
     return write_json_with_retry(p, obj, label)
 
 def sync_gemini():
-    return sync_json_map('Gemini', HOME/'.gemini'/'settings.json', 'mcpServers', allowed=True)
+    return sync_json_map(
+        'Gemini', HOME/'.gemini'/'settings.json', 'mcpServers', allowed=True, key_client="gemini"
+    )
 
 def sync_iflow():
-    return sync_json_map('iFlow', HOME/'.iflow'/'settings.json', 'mcpServers')
+    return sync_json_map('iFlow', HOME/'.iflow'/'settings.json', 'mcpServers', key_client="iflow")
 
 def sync_droid():
-    return sync_json_map('Droid', HOME/'.factory'/'mcp.json', 'mcpServers')
+    return sync_json_map('Droid', HOME/'.factory'/'mcp.json', 'mcpServers', key_client="droid")
 
 def sync_cursor():
-    return sync_json_map('Cursor', HOME/'.cursor'/'mcp.json', 'mcpServers')
+    return sync_json_map('Cursor', HOME/'.cursor'/'mcp.json', 'mcpServers', key_client="cursor")
 
 def sync_vscode():
     if OS=='darwin':
-        paths = [HOME/'Library'/'Application Support'/'Code'/'User'/'mcp.json',
-                 HOME/'Library'/'Application Support'/'Code - Insiders'/'User'/'mcp.json']
+        targets = [
+            ("vscode-user", HOME/'Library'/'Application Support'/'Code'/'User'/'mcp.json'),
+            ("vscode-insiders", HOME/'Library'/'Application Support'/'Code - Insiders'/'User'/'mcp.json'),
+        ]
     else:
-        paths = [HOME/'.config'/'Code'/'User'/'mcp.json',
-                 HOME/'.config'/'Code - Insiders'/'User'/'mcp.json']
-    servers = build_mcpServers()
+        targets = [
+            ("vscode-user", HOME/'.config'/'Code'/'User'/'mcp.json'),
+            ("vscode-insiders", HOME/'.config'/'Code - Insiders'/'User'/'mcp.json'),
+        ]
     success_count = 0
-    for p in paths:
-        success = write_json_with_retry(p, {'servers': servers}, f'VS Code ({p.parent.parent.name})')
+    for client, p in targets:
+        servers = build_mcpServers(client=client)
+        success = write_json_with_retry(
+            p, {'servers': servers}, f'VS Code ({p.parent.parent.name})'
+        )
         if success:
             success_count += 1
     if success_count == 0:
         log_err('所有 VS Code 配置更新失败')
         return False
-    elif success_count < len(paths):
-        log_warn(f'部分 VS Code 配置更新失败: {success_count}/{len(paths)}')
+    elif success_count < len(targets):
+        log_warn(f'部分 VS Code 配置更新失败: {success_count}/{len(targets)}')
     return True
 
 def sync_claude_file():
@@ -272,7 +313,7 @@ def sync_claude_file():
         except Exception as e:
             log_warn(f'Claude settings 解析失败，将重写: {e}')
             obj = {}
-    obj['mcpServers'] = build_mcpServers()
+    obj['mcpServers'] = build_mcpServers(client="claude-file")
     write_json(p, obj)
     log_ok(f'Claude(文件) 配置已更新: {p}')
     return True
@@ -294,7 +335,7 @@ def sync_claude_cmd():
     missing = sorted(want - have)
     ok = True
     for name in missing:
-        info = SERVERS[name]
+        info = _to_target(SERVERS[name] or {}, client="claude-reg")
         cmd = ['claude','mcp','add','--transport','stdio', name]
         for k,v in (info.get('env') or {}).items():
             cmd.extend(['-e', f'{k}={v}'])
