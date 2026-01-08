@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.10 (2026-01-09)
+
+- Central：强化校验并对齐 Augment MCP 落地。
+- Claude Code：支持 scope（user/local/project），并可用 `MCP_CLAUDE_SCOPE` 指定；user scope 读取 `~/.claude.json` 更稳定。
+- UI：新增 Claude scope 选择；相关 API 支持 `claude_scope` 参数。
+- CLI/脚本：Claude registry 的 add/remove 统一携带 `-s <scope>`，并使用 `--env KEY=VAL` 传参。
+- 文档：README / 架构图 / Troubleshooting 对齐 Claude Code 注册表策略与 scope 说明。
+
 ## v1.3.9 (2025-12-25)
 
 - 配置：移除 `寸止` 服务器配置
