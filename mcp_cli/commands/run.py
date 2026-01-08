@@ -322,38 +322,47 @@ def apply_claude(subset: dict, verbose: bool = False, dry_run: bool = False) -> 
     )
 
     # 注册表端：移除多余，补齐缺失，并强制与中央清单一致
+    scope = U.claude_registry_scope()
     want = sorted(list(subset.keys()))
     if dry_run:
         print("[DRY-RUN] 将对齐 Claude 注册表（预览）")
+        print(f"  scope: {scope}")
         print("  keys:", ", ".join(want) if want else "(none)")
         # 展示 add/remove 预览
         for n in want:
             info = subset.get(n) or {}
-            cmd = ["claude", "mcp", "add", "--transport", "stdio", n]
+            cmd = ["claude", "mcp", "add", "--transport", "stdio"]
             for k, v in (info.get("env") or {}).items():
-                cmd += ["-e", f"{k}={v}"]
+                cmd += ["--env", f"{k}={v}"]
+            cmd += ["-s", scope, n]
             cmd += ["--", _expand_tilde(info.get("command", ""))]
             cmd += [_expand_tilde(str(a)) for a in (info.get("args") or [])]
             print("[DRY-RUN]", " ".join(cmd))
         return 0
 
     # 实际对齐：先 remove 再 add（全量覆盖，避免残留）
-    # 先尝试列出已注册项
-    try:
-        out = subprocess.run(["claude", "mcp", "list"], capture_output=True, text=True, timeout=10)
-        text = (out.stdout or "") + "\n" + (out.stderr or "")
-        present = []
-        for line in text.splitlines():
-            if ":" in line:
-                present.append(line.split(":", 1)[0].strip())
-    except Exception:
-        present = []
+    # 先读取已注册项（user scope 直接读 ~/.claude.json 更稳健；其它 scope 回退到 `claude mcp list`）
+    if scope == "user":
+        present = sorted(U.claude_user_mcp_servers())
+    else:
+        try:
+            out = subprocess.run(["claude", "mcp", "list"], capture_output=True, text=True, timeout=10)
+            text = (out.stdout or "") + "\n" + (out.stderr or "")
+            present = []
+            for line in text.splitlines():
+                line = line.strip()
+                if not line or line.startswith("plugin:"):
+                    continue
+                if ":" in line:
+                    present.append(line.split(":", 1)[0].strip())
+        except Exception:
+            present = []
     # 移除所有现有注册项，确保只保留 want
     remove_ok = []
     remove_fail = []
     for n in sorted(set(present)):
         try:
-            cmd_rm = ["claude", "mcp", "remove", n]
+            cmd_rm = ["claude", "mcp", "remove", n, "-s", scope]
             if verbose:
                 print("[VERBOSE]", " ".join(cmd_rm))
             r = subprocess.run(cmd_rm, check=False, timeout=10)
@@ -366,12 +375,13 @@ def apply_claude(subset: dict, verbose: bool = False, dry_run: bool = False) -> 
     for n in want:
         info = subset.get(n) or {}
         try:
-            subprocess.run(["claude", "mcp", "remove", n], check=False, timeout=10)
+            subprocess.run(["claude", "mcp", "remove", n, "-s", scope], check=False, timeout=10)
         except Exception:
             pass
-        cmd = ["claude", "mcp", "add", "--transport", "stdio", n]
+        cmd = ["claude", "mcp", "add", "--transport", "stdio"]
         for k, v in (info.get("env") or {}).items():
-            cmd += ["-e", f"{k}={v}"]
+            cmd += ["--env", f"{k}={v}"]
+        cmd += ["-s", scope, n]
         cmd += ["--", _expand_tilde(info.get("command", ""))]
         cmd += [_expand_tilde(str(a)) for a in (info.get("args") or [])]
         try:
@@ -381,7 +391,7 @@ def apply_claude(subset: dict, verbose: bool = False, dry_run: bool = False) -> 
             (add_ok if r.returncode == 0 else add_fail).append(n)
         except Exception:
             add_fail.append(n)
-    print("[OK] Claude 注册表已与所选集合对齐")
+    print(f"[OK] Claude 注册表已与所选集合对齐 (scope={scope})")
     if remove_ok or remove_fail:
         print(
             f"  remove: ok={len(remove_ok)} fail={len(remove_fail)}"

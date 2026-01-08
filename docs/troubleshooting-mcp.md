@@ -55,7 +55,7 @@
     - `CHROME_DEVTOOLS_MCP_EXTRA_ARGS="--disable-dev-shm-usage --disable-gpu"`
 - 注册表示例
   - Claude：
-    - `claude mcp add --transport stdio chrome-devtools -e CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX=1 -e CHROME_DEVTOOLS_MCP_EXTRA_ARGS='--disable-dev-shm-usage --disable-gpu' -- npx -y chrome-devtools-mcp@latest`
+    - `claude mcp add --transport stdio --env CHROME_DEVTOOLS_MCP_DISABLE_SANDBOX=1 --env CHROME_DEVTOOLS_MCP_EXTRA_ARGS='--disable-dev-shm-usage --disable-gpu' -s user chrome-devtools -- npx -y chrome-devtools-mcp@latest`
   - Droid：
     - `droid mcp add chrome-devtools "npx -y chrome-devtools-mcp@latest"`
 
@@ -63,17 +63,16 @@
 
 ## 三、各客户端落地要点
 
-### 1) Claude（文件为主 + 注册表兜底）
-- 文件：`~/.claude/settings.json` 顶层 `mcpServers`（推荐主来源）。
-- 注册表：`claude mcp add/remove` 会写入内部“注册表”，`/mcp` 会合并显示它与文件配置。
+### 1) Claude Code（注册表为主 + 文件镜像）
+- 注册表（推荐）：使用 `claude mcp add/remove -s user` 落地，全局写入 `~/.claude.json` 顶层 `mcpServers`（`claude mcp list/get` 以此为准）。
+- 文件镜像（可选）：`~/.claude/settings.json` 顶层 `mcpServers`；本项目会同步写入以便兼容/可读，但不保证 `claude mcp list` 会读取它。
 - 使用 `mcp run` 为 Claude 下发服务时：
-  - 文件端以当前中央清单为基准生成 `mcpServers`；
-  - 注册表端会“先 remove 再 add”，确保与这次选择的服务集合一致；
+  - 文件端与注册表端都会以当前中央清单为基准生成/对齐；默认 scope=user（可用 `MCP_CLAUDE_SCOPE=local|project` 覆盖）。
   - 若对应服务已通过 `mcp localize` 或 `mcp run --localize` 本地化，则优先使用本地二进制路径及其参数，否则回退到中央清单中的 `command/args`（通常是 `npx -y <pkg>@latest`；`serena` 始终使用本地二进制）。
 - 清理重复与历史别名（支持作用域）：
-  - 移除：`claude mcp remove <name> -s local`、`-s user`（或不加 `-s` 逐级尝试）。
-- 注册写法（务必注意 `-e ... --` 顺序）：
-  - `claude mcp add --transport stdio <name> -e KEY=VAL ... -- <command> <args>`
+  - 移除：`claude mcp remove -s user <name>`、`claude mcp remove -s local <name>`（或不加 `-s` 逐级尝试）。
+- 注册写法（务必注意 `--env ... -s user <name> --` 顺序）：
+  - `claude mcp add --transport stdio --env KEY=VAL ... -s user <name> -- <command> <args>`
 
 ### 2) Droid（factory.ai CLI）
 - 配置文件（官方）：`~/.factory/mcp.json` 顶层 `mcpServers`，项内 `command`、可选 `args`、`env`，常见 `type: stdio`。
@@ -195,9 +194,9 @@ droid mcp add playwright "npx -y @playwright/mcp@latest --headless --no-sandbox 
 本仓库在一次“旧版 → 最新版”的现场升级过程中，暴露出若干典型问题，已在脚本与 CLI 中修复或形成标准操作。记录如下，便于新人“一次成功”。
 
 - Claude 项目级覆盖导致“清不干净”
-- 现象：`mcp status` 显示 `Claude(register)` 仍有某项（如 `filesystem`），`claude mcp list` 也显示 Connected；但已清空 `~/.claude/settings.json` 与注册表。
+- 现象：`mcp status` 显示 `Claude(register)` 仍有某项（如 `filesystem`），`claude mcp list` 也显示 Connected；但已清空 `~/.claude/settings.json`，并移除了 `~/.claude.json` 顶层 `mcpServers`（user scope）与相关注册表条目。
   - 根因：`~/.claude.json` 内 `projects.*.mcpServers` 会覆盖/合并显示注册表与文件端。
-  - 处置：清空 `~/.claude.json` 中所有 `projects.*.mcpServers`；现在 `mcp clear --client claude` 会自动完成该步骤（`scripts/onboard-cursor-minimal.sh` 亦会调用 clear），并增强 `mcp` 的注册表读取稳健性（延长超时、合并 stdout+stderr）。
+  - 处置：清空 `~/.claude.json` 中所有 `projects.*.mcpServers`；现在 `mcp clear --client claude` 会自动完成该步骤（`scripts/onboard-cursor-minimal.sh` 亦会调用 clear），并在 user scope 下优先直接读取 `~/.claude.json`（避免 `claude mcp list` 变慢导致误判）。
 
 - 误用系统 `cc` 导致“连通性探测”异常输出
   - 现象：体检脚本打印 `[cc] Claude Code: cc mcp list`，随后出现 clang 报错。
@@ -213,7 +212,7 @@ droid mcp add playwright "npx -y @playwright/mcp@latest --headless --no-sandbox 
 
 - 新人一次成活的最小落地
   - 方案：运行 `bash scripts/onboard-cursor-minimal.sh`，仅为 Cursor 启用 `context7` 与 `task-master-ai`，其它 CLI/IDE 保持“裸奔”。
-  - 复验：`mcp status cursor` 应仅列出上述两项；`claude mcp list` 应为空。
+  - 复验：`mcp status cursor` 应仅列出上述两项；`claude mcp list` 应仅显示你为 Claude 落地的服务（以及可能存在的 `plugin:*`）。
 
 ## 八、结语
 

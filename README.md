@@ -55,7 +55,7 @@ mcp status cursor
 
 - **统一来源**：\`~/.mcp-central/config/mcp-servers.json\`
 - **仅改 MCP 段**：不同目标只写入各自 MCP 部分（如 Codex 的 \`[mcp_servers.*]\`、Gemini 的 \`mcpServers\` 等），不触碰其它设置
-- **Claude**：文件为主（\`~/.claude/settings.json\`），命令兜底仅补"缺失项"
+- **Claude Code**：注册表为主（\`claude mcp add/remove -s user\` 写入 \`~/.claude.json\` 顶层 \`mcpServers\`）；同时镜像写入 \`~/.claude/settings.json\` 的 \`mcpServers\`
 - **默认全部启用**：清单里未显式写 \`enabled: false\` 的服务都视为启用；是否真正"加载"，由你对某个 CLI/IDE 的落地选择决定
   - 行为约束：\`mcp run\` 仅允许下发“已启用”的服务；\`enabled: false\` 的条目会被跳过/拒绝（需先在 central 启用）
   - 状态基线：\`mcp status\` 的 on/off 以“已启用”集合为基线；若目标端仍配置了 central 已禁用的服务，会提示告警
@@ -134,7 +134,7 @@ mcp --help
 - **Codex**: \`~/.codex/config.toml\` - 仅 \`[mcp_servers.*]\` 与 \`*.env\`
 - **Gemini**: \`~/.gemini/settings.json\` - 仅 \`mcpServers\` + \`mcp.allowed\`
 - **iFlow**: \`~/.iflow/settings.json\` - 仅 \`mcpServers\`
-- **Claude**: \`~/.claude/settings.json\` - 写 \`mcpServers\`；若缺项则命令兜底补齐
+- **Claude Code**: \`~/.claude.json\` - 通过 \`claude mcp add/remove -s user\` 落地（全局）；同时镜像写入 \`~/.claude/settings.json\` 的 \`mcpServers\`
 - **Droid**: \`~/.factory/mcp.json\` - 仅 \`mcpServers\`；在 `mcp run` 的交互中选择 Droid 后，会对所选集合执行“remove → add”强制对齐注册表。
 - **Cursor**: \`~/.cursor/mcp.json\` - 仅 \`mcpServers\`
 - **VS Code**: CLI 会按平台自动选择路径：

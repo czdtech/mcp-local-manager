@@ -5,7 +5,8 @@ MCP Auto Sync (macOS/Linux)
 - Codex:   ~/.codex/config.toml              [mcp_servers.*] + *.env 子表
 - Gemini:  ~/.gemini/settings.json           mcpServers + mcp.allowed
 - iFlow:   ~/.iflow/settings.json            mcpServers
-- Claude:  ~/.claude/settings.json           mcpServers（命令兜底仅补缺项）
+- Claude Code: ~/.claude.json                mcpServers（user scope，推荐；由 claude mcp add/remove 写入）
+             + ~/.claude/settings.json       mcpServers（文件镜像/兼容）
 - Droid:   ~/.factory/mcp.json               mcpServers
 - Cursor:  ~/.cursor/mcp.json                mcpServers
 - VS Code: macOS ~/Library/Application Support/Code*/User/mcp.json 顶层 servers
@@ -13,8 +14,8 @@ MCP Auto Sync (macOS/Linux)
 
 与最新 ~/.mcp-central 对齐：
 - 不使用 wrappers；Node 生态 server 统一采用 npx 显式最新版（@latest）。
-- Claude 命令兜底时，环境变量必须位于 name 与 "--" 之间：
-  claude mcp add --transport stdio <name> -e KEY=VAL ... -- <command> <args>
+- Claude 命令兜底时，建议显式指定 scope=user（全局），并注意参数顺序：
+  claude mcp add --transport stdio --env KEY=VAL ... -s user <name> -- <command> <args>
 """
 
 import json, os, re, shutil, subprocess, sys, platform
@@ -386,11 +387,41 @@ def sync_claude_file():
     log_ok(f'Claude(文件) 配置已更新: {p}')
     return True
 
-def claude_registered():
+
+def _claude_scope() -> str:
+    if _CLI_U is not None and hasattr(_CLI_U, "claude_registry_scope"):
+        try:
+            return str(_CLI_U.claude_registry_scope())
+        except Exception:
+            pass
+    scope = (os.environ.get("MCP_CLAUDE_SCOPE") or "user").strip().lower()
+    return scope if scope in ("local", "user", "project") else "user"
+
+
+def _claude_user_mcp_servers() -> set[str]:
+    # 避免模块级 HOME 常量在测试/子进程中被提前绑定；这里动态读取 Path.home()
+    p = Path.home() / ".claude.json"
+    if not p.exists():
+        return set()
     try:
-        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=8)
+        obj = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    m = obj.get("mcpServers") if isinstance(obj, dict) else None
+    return set(m.keys()) if isinstance(m, dict) else set()
+
+def claude_registered():
+    scope = _claude_scope()
+    if scope == "user":
+        return _claude_user_mcp_servers()
+    try:
+        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=10)
+        text = (out.stdout or '') + "\n" + (out.stderr or '')
         reg = set()
-        for line in (out.stdout or '').splitlines():
+        for line in text.splitlines():
+            line = (line or '').strip()
+            if not line or line.startswith('plugin:'):
+                continue
             if ':' in line:
                 reg.add(line.split(':',1)[0].strip())
         return reg
@@ -398,16 +429,17 @@ def claude_registered():
         return set()
 
 def sync_claude_cmd():
+    scope = _claude_scope()
     want = {k for k,v in SERVERS.items() if v.get('enabled', True)}
     have = claude_registered()
     missing = sorted(want - have)
     ok = True
     for name in missing:
         info = _to_target(SERVERS[name] or {}, client="claude-reg")
-        cmd = ['claude','mcp','add','--transport','stdio', name]
-        # 环境变量必须在 name 与 -- 之间
+        cmd = ['claude','mcp','add','--transport','stdio']
         for k,v in (info.get('env') or {}).items():
-            cmd.extend(['-e', f'{k}={v}'])
+            cmd.extend(['--env', f'{k}={v}'])
+        cmd += ['-s', scope, name]
         # 展开路径中的 ~，并保证 args 为字符串
         cmd += ['--', _expand_tilde(info.get('command',''))]
         cmd += [_expand_tilde(str(a)) for a in (info.get('args') or [])]

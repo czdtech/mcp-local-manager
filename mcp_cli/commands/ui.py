@@ -30,6 +30,21 @@ _UI_INDEX_PATH = Path(__file__).with_name("ui_index.html")
 _UI_INDEX_CACHE: bytes | None = None
 
 
+def _coerce_claude_scope(v: object | None) -> str:
+    """将用户输入规范化为 Claude scope。
+
+    Claude Code 支持：local/user/project。
+    - None: 回退到环境变量/默认值（utils.claude_registry_scope，默认 user）
+    """
+
+    if v is None:
+        return U.claude_registry_scope()
+    s = str(v).strip().lower()
+    if s in ("local", "user", "project"):
+        return s
+    raise ValueError("claude_scope 必须是 local/user/project")
+
+
 def _expand_tilde(v: object) -> object:
     if isinstance(v, str):
         try:
@@ -374,12 +389,20 @@ def _to_droid_entry(info: dict[str, Any]) -> dict[str, Any]:
     return server_config
 
 
-def _sync_claude_registry(name: str, info: dict[str, Any] | None, on: bool) -> list[str]:
+def _sync_claude_registry(
+    name: str,
+    info: dict[str, Any] | None,
+    on: bool,
+    *,
+    claude_scope: str | None = None,
+) -> list[str]:
     notes: list[str] = []
+    scope = _coerce_claude_scope(claude_scope)
     if on:
-        cmd = ["claude", "mcp", "add", "--transport", "stdio", name]
+        cmd = ["claude", "mcp", "add", "--transport", "stdio"]
         for k, v in (info or {}).get("env") or {}.items():
-            cmd += ["-e", f"{k}={v}"]
+            cmd += ["--env", f"{k}={v}"]
+        cmd += ["-s", scope, name]
         cmd += ["--", str(_expand_tilde((info or {}).get("command", "")))]
         cmd += [str(_expand_tilde(a)) for a in ((info or {}).get("args") or [])]
         try:
@@ -393,7 +416,7 @@ def _sync_claude_registry(name: str, info: dict[str, Any] | None, on: bool) -> l
         return notes
 
     try:
-        cmd_rm = ["claude", "mcp", "remove", name]
+        cmd_rm = ["claude", "mcp", "remove", name, "-s", scope]
         r = subprocess.run(cmd_rm, check=False, timeout=15, capture_output=True, text=True)
         if r.returncode != 0:
             notes.append(
@@ -487,7 +510,7 @@ def _codex_render_server_block(name: str, info: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def remove_from_target(client: str, name: str) -> dict[str, Any]:
+def remove_from_target(client: str, name: str, *, claude_scope: str | None = None) -> dict[str, Any]:
     """从目标端删除某个 server（不会为不存在的配置文件创建空文件）。"""
     name = str(name or "").strip()
     if not name:
@@ -572,7 +595,7 @@ def remove_from_target(client: str, name: str) -> dict[str, Any]:
                 _remove_json_key(p, "mcpServers")
             else:
                 skipped = f"文件端配置不存在（将仅尝试注册表移除）: {p}"
-            notes += _sync_claude_registry(name, None, False)
+            notes += _sync_claude_registry(name, None, False, claude_scope=claude_scope)
             return {"client": client, "changed": changed, "skipped": skipped, "notes": notes}
 
         if client == "droid":
@@ -602,6 +625,8 @@ def remove_from_target(client: str, name: str) -> dict[str, Any]:
 
 def remove_everywhere(
     name: str,
+    *,
+    claude_scope: str | None = None,
 ) -> dict[str, Any]:
     """从多个目标端移除指定 server（默认：UI 支持的全部目标）。"""
     name = str(name or "").strip()
@@ -612,14 +637,20 @@ def remove_everywhere(
     errors: dict[str, str] = {}
     for c in [c["key"] for c in _client_catalog()]:
         try:
-            results.append(remove_from_target(c, name))
+            results.append(remove_from_target(c, name, claude_scope=claude_scope))
         except Exception as e:
             errors[c] = str(e)
 
     return {"server": name, "targets": results, "errors": errors}
 
 
-def apply_toggle(client: str, name: str, on: bool) -> dict[str, Any]:
+def apply_toggle(
+    client: str,
+    name: str,
+    on: bool,
+    *,
+    claude_scope: str | None = None,
+) -> dict[str, Any]:
     central = _central_state()
     servers_all: dict[str, Any] = central.get("servers") or {}
     disabled_names = set(central.get("disabled_names") or [])
@@ -660,7 +691,7 @@ def apply_toggle(client: str, name: str, on: bool) -> dict[str, Any]:
                 obj["mcpServers"] = mp
                 if changed:
                     _save_json_map(p, obj)
-            notes += _sync_claude_registry(name, info, on)
+            notes += _sync_claude_registry(name, info, on, claude_scope=claude_scope)
             return {"notes": notes, "client": client, "changed": {"server": name, "on": on}}
 
         if client == "cursor":
@@ -811,7 +842,16 @@ class _UIHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/clients":
-            _json_ok(self, {"ok": True, "clients": _client_catalog(), "default": "cursor"})
+            _json_ok(
+                self,
+                {
+                    "ok": True,
+                    "clients": _client_catalog(),
+                    "default": "cursor",
+                    "claude_scopes": ["user", "local", "project"],
+                    "cwd": os.getcwd(),
+                },
+            )
             return
 
         if path == "/api/state":
@@ -863,7 +903,8 @@ class _UIHandler(http.server.BaseHTTPRequestHandler):
                 _json_error(self, 400, "缺少 client/server")
                 return
             try:
-                out = apply_toggle(client, name, on)
+                claude_scope = data.get("claude_scope", None)
+                out = apply_toggle(client, name, on, claude_scope=claude_scope)
                 res = {"ok": True, **out}
             except Exception as e:
                 _json_error(self, 400, str(e))
@@ -909,7 +950,8 @@ class _UIHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/targets/remove":
             name = str(data.get("server") or data.get("name") or "").strip()
             try:
-                out = remove_everywhere(name)
+                claude_scope = data.get("claude_scope", None)
+                out = remove_everywhere(name, claude_scope=claude_scope)
             except Exception as e:
                 _json_error(self, 400, str(e))
                 return

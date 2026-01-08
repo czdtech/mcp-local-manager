@@ -153,17 +153,61 @@ def _codex_keys() -> set[str]:
 
 
 def _claude_registered() -> set[str]:
+    """读取 Claude Code MCP 注册表中的 server 名称集合。
+
+    - 当 scope=user 时，优先直接读取 ~/.claude.json 顶层 mcpServers（更快且不受 `claude mcp list` 变慢影响）。
+    - 其它 scope 回退到 `claude mcp list` 解析输出。
+    """
+
+    scope = claude_registry_scope()
+    if scope == "user":
+        return claude_user_mcp_servers()
+
     try:
-        t = float(os.environ.get("CLAUDE_LIST_TIMEOUT", "3"))
+        t = float(os.environ.get("CLAUDE_LIST_TIMEOUT", "10"))
         out = subprocess.run(["claude", "mcp", "list"], capture_output=True, text=True, timeout=t)
         text = (out.stdout or "") + "\n" + (out.stderr or "")
         reg = set()
         for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("plugin:"):
+                continue
             if ":" in line:
                 reg.add(line.split(":", 1)[0].strip())
         return reg
     except Exception:
         return set()
+
+
+def claude_registry_scope() -> str:
+    """Claude MCP 注册表写入 scope。
+
+    Claude Code 的 `claude mcp add/remove` 支持 scope：local/user/project。
+    - user: 全局可用（推荐）
+    - local/project: 与当前目录绑定
+
+    通过环境变量 `MCP_CLAUDE_SCOPE` 覆盖；默认使用 user。
+    """
+
+    scope = (os.environ.get("MCP_CLAUDE_SCOPE") or "user").strip().lower()
+    if scope in ("local", "user", "project"):
+        return scope
+    if scope:
+        print(
+            f"⚠️  MCP_CLAUDE_SCOPE={scope!r} 非法，已回退到 'user'",
+            file=sys.stderr,
+        )
+    return "user"
+
+
+def claude_user_mcp_servers() -> set[str]:
+    """从 ~/.claude.json 顶层 mcpServers 读取 user scope 下的 server 名称集合。"""
+
+    p = HOME / ".claude.json"
+    obj = load_json(p, {}, "Claude user 配置读取")
+    if isinstance(obj, dict) and isinstance(obj.get("mcpServers"), dict):
+        return set(obj["mcpServers"].keys())
+    return set()
 
 
 def _print_client(

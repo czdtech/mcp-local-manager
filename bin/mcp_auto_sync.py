@@ -318,11 +318,41 @@ def sync_claude_file():
     log_ok(f'Claude(文件) 配置已更新: {p}')
     return True
 
-def claude_registered():
+
+def _claude_scope() -> str:
+    if _CLI_U is not None and hasattr(_CLI_U, "claude_registry_scope"):
+        try:
+            return str(_CLI_U.claude_registry_scope())
+        except Exception:
+            pass
+    scope = (os.environ.get("MCP_CLAUDE_SCOPE") or "user").strip().lower()
+    return scope if scope in ("local", "user", "project") else "user"
+
+
+def _claude_user_mcp_servers() -> set[str]:
+    # 避免模块级 HOME 常量在测试/子进程中被提前绑定；这里动态读取 Path.home()
+    p = Path.home() / ".claude.json"
+    if not p.exists():
+        return set()
     try:
-        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=8)
+        obj = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    m = obj.get("mcpServers") if isinstance(obj, dict) else None
+    return set(m.keys()) if isinstance(m, dict) else set()
+
+def claude_registered():
+    scope = _claude_scope()
+    if scope == "user":
+        return _claude_user_mcp_servers()
+    try:
+        out = subprocess.run(['claude','mcp','list'], capture_output=True, text=True, timeout=10)
+        text = (out.stdout or '') + "\n" + (out.stderr or '')
         reg = set()
-        for line in (out.stdout or '').splitlines():
+        for line in text.splitlines():
+            line = (line or '').strip()
+            if not line or line.startswith('plugin:'):
+                continue
             if ':' in line:
                 reg.add(line.split(':',1)[0].strip())
         return reg
@@ -330,15 +360,17 @@ def claude_registered():
         return set()
 
 def sync_claude_cmd():
+    scope = _claude_scope()
     want = {k for k,v in SERVERS.items() if v.get('enabled', True)}
     have = claude_registered()
     missing = sorted(want - have)
     ok = True
     for name in missing:
         info = _to_target(SERVERS[name] or {}, client="claude-reg")
-        cmd = ['claude','mcp','add','--transport','stdio', name]
+        cmd = ['claude','mcp','add','--transport','stdio']
         for k,v in (info.get('env') or {}).items():
-            cmd.extend(['-e', f'{k}={v}'])
+            cmd.extend(['--env', f'{k}={v}'])
+        cmd += ['-s', scope, name]
         cmd += ['--', _expand_tilde(info.get('command',''))]
         cmd += [_expand_tilde(str(a)) for a in (info.get('args') or [])]
         try:

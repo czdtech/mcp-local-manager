@@ -75,15 +75,22 @@ def _clear_claude_registry(verbose: bool = False, dry_run: bool = False):
     if dry_run:
         print("[DRY-RUN] 将清空 Claude 注册表（预览，跳过 `claude mcp list`）")
         return 0
-    try:
-        out = subprocess.run(["claude", "mcp", "list"], capture_output=True, text=True, timeout=30)
-        text = (out.stdout or "") + "\n" + (out.stderr or "")
-        names = []
-        for line in text.splitlines():
-            if ":" in line:
-                names.append(line.split(":", 1)[0].strip())
-    except Exception:
-        names = []
+    scope = U.claude_registry_scope()
+    if scope == "user":
+        names = sorted(U.claude_user_mcp_servers())
+    else:
+        try:
+            out = subprocess.run(["claude", "mcp", "list"], capture_output=True, text=True, timeout=30)
+            text = (out.stdout or "") + "\n" + (out.stderr or "")
+            names = []
+            for line in text.splitlines():
+                line = line.strip()
+                if not line or line.startswith("plugin:"):
+                    continue
+                if ":" in line:
+                    names.append(line.split(":", 1)[0].strip())
+        except Exception:
+            names = []
     if not names:
         if verbose:
             print("[INFO] Claude 注册表无条目需清理")
@@ -92,7 +99,7 @@ def _clear_claude_registry(verbose: bool = False, dry_run: bool = False):
     fail = 0
     for n in names:
         try:
-            cmd = ["claude", "mcp", "remove", n]
+            cmd = ["claude", "mcp", "remove", n, "-s", scope]
             if verbose:
                 print("[VERBOSE]", " ".join(cmd))
             r = subprocess.run(cmd, check=False, timeout=10)
@@ -100,7 +107,7 @@ def _clear_claude_registry(verbose: bool = False, dry_run: bool = False):
             fail += 1 if r.returncode != 0 else 0
         except Exception:
             fail += 1
-    print(f"[OK] 已清理 Claude 注册表: ok={ok} fail={fail}")
+    print(f"[OK] 已清理 Claude 注册表 (scope={scope}): ok={ok} fail={fail}")
     return 0
 
 

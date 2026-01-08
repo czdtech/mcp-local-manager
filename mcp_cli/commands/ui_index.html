@@ -113,6 +113,15 @@
       <div class="row">
         <label class="hint">目标：</label>
         <select id="client"></select>
+        <span id="claudeScopeWrap" class="row" style="display:none; gap:8px; align-items:center;">
+          <label class="hint">Claude scope：</label>
+          <select id="claudeScope">
+            <option value="user">user（全局）</option>
+            <option value="local">local（当前目录项目/私有）</option>
+            <option value="project">project（当前目录项目/.mcp.json）</option>
+          </select>
+          <span class="hint" id="claudeScopeHint"></span>
+        </span>
         <button id="refresh">刷新</button>
       </div>
     </div>
@@ -171,6 +180,25 @@
 const qs = new URLSearchParams(location.search);
 const token = qs.get("token") || "";
 const $ = (id) => document.getElementById(id);
+
+const CLAUDE_SCOPE_KEY = "mcp.ui.claudeScope";
+
+function claudeScope() {
+  const el = $("claudeScope");
+  return (el && el.value) ? el.value : "user";
+}
+
+function setClaudeScopeUIVisible(on) {
+  const wrap = $("claudeScopeWrap");
+  if (wrap) wrap.style.display = on ? "inline-flex" : "none";
+}
+
+function attachClaudeScopeHint(meta) {
+  const hint = $("claudeScopeHint");
+  if (!hint) return;
+  const cwd = (meta && meta.cwd) ? String(meta.cwd) : "";
+  hint.textContent = cwd ? `（local/project 作用于 UI 启动目录：${cwd}）` : "";
+}
 
 function log(line) {
   const el = $("log");
@@ -266,7 +294,7 @@ function renderCentralAdmin(central) {
       }
       btnGlobalRm.disabled = true;
       try {
-        const res = await apiPost("/api/targets/remove", { server: name });
+        const res = await apiPost("/api/targets/remove", { server: name, claude_scope: claudeScope() });
         (res.targets || []).forEach((t) => {
           (t.notes || []).forEach((n) => log(n));
           if (t.changed) log(`已从 ${t.client} 移除：${name}`);
@@ -375,11 +403,13 @@ function renderRows(central, target) {
         btnRm.addEventListener("click", async () => {
           btnRm.disabled = true;
           try {
-            const res = await apiPost("/api/toggle", {
+            const payload = {
               client: $("client").value,
               server: name,
               on: false,
-            });
+            };
+            if (payload.client === "claude") payload.claude_scope = claudeScope();
+            const res = await apiPost("/api/toggle", payload);
             if (res.notes && res.notes.length) res.notes.forEach(n => log(n));
             log(`已移除：${name}`);
           } catch (e) {
@@ -422,11 +452,13 @@ function renderRows(central, target) {
       btnRm.addEventListener("click", async () => {
         btnRm.disabled = true;
         try {
-          const res = await apiPost("/api/toggle", {
+          const payload = {
             client: $("client").value,
             server: name,
             on: false,
-          });
+          };
+          if (payload.client === "claude") payload.claude_scope = claudeScope();
+          const res = await apiPost("/api/toggle", payload);
           if (res.notes && res.notes.length) res.notes.forEach(n => log(n));
           log(`已移除 target-only：${name}`);
         } catch (e) {
@@ -461,11 +493,13 @@ function renderRows(central, target) {
       const want = cb.checked;
       cb.disabled = true;
       try {
-        const res = await apiPost("/api/toggle", {
+        const payload = {
           client: $("client").value,
           server: name,
           on: want,
-        });
+        };
+        if (payload.client === "claude") payload.claude_scope = claudeScope();
+        const res = await apiPost("/api/toggle", payload);
         if (res.notes && res.notes.length) res.notes.forEach(n => log(n));
         log(`已${want ? "开启" : "关闭"}：${name}`);
       } catch (e) {
@@ -519,8 +553,26 @@ async function init() {
     sel.appendChild(opt);
   });
   sel.value = meta.default || "cursor";
+
+  // Claude scope：记忆选择（仅影响 claude mcp add/remove）
+  const scopeSel = $("claudeScope");
+  if (scopeSel) {
+    const saved = (localStorage.getItem(CLAUDE_SCOPE_KEY) || "").trim();
+    scopeSel.value = saved || "user";
+    scopeSel.addEventListener("change", () => {
+      localStorage.setItem(CLAUDE_SCOPE_KEY, scopeSel.value);
+      log(`Claude scope 已切换为：${scopeSel.value}`);
+    });
+  }
+  attachClaudeScopeHint(meta);
+
   $("refresh").addEventListener("click", refresh);
-  sel.addEventListener("change", refresh);
+  sel.addEventListener("change", async () => {
+    setClaudeScopeUIVisible(sel.value === "claude");
+    await refresh();
+  });
+
+  setClaudeScopeUIVisible(sel.value === "claude");
 
   await refresh();
   log("UI 已就绪：开关即写入（写入前自动生成 *.backup）");

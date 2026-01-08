@@ -13,7 +13,7 @@ package "目标配置 (仅写 MCP 段)" {
   rectangle "Codex\n~/.codex/config.toml\n[mcp_servers.*]" as CODEX
   rectangle "Gemini\n~/.gemini/settings.json\nmcpServers + mcp.allowed" as GEMINI
   rectangle "iFlow\n~/.iflow/settings.json\nmcpServers" as IFLOW
-  rectangle "Claude(文件)\n~/.claude/settings.json\nmcpServers" as CLAUDE_FILE
+  rectangle "Claude(mirror)\n~/.claude/settings.json\nmcpServers" as CLAUDE_FILE
   rectangle "Cursor\n~/.cursor/mcp.json\nmcpServers" as CURSOR
   rectangle "VS Code\n~/.config/Code/User/mcp.json\nservers" as VSCODE
   rectangle "Droid\n~/.factory/mcp.json\nmcpServers" as DROID
@@ -34,8 +34,9 @@ MCP -down-> CURSOR
 MCP -down-> VSCODE
 MCP -down-> DROID
 
-rectangle "Claude(注册表)\nregister sync (internal)\n(~/.claude.json 项目作用域)" as CLAUDE_REG
-SYNC -right-> CLAUDE_REG : 兜底注册
+rectangle "Claude Code registry\nclaude mcp add/remove (-s user/local/project)\n(~/.claude.json: mcpServers / projects.*.mcpServers)" as CLAUDE_REG
+SYNC -right-> CLAUDE_REG
+MCP -right-> CLAUDE_REG
 
 cloud "运行时（stdio）" as RUNTIME
 CODEX -down-> RUNTIME

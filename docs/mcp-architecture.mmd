@@ -6,7 +6,7 @@ flowchart TD
     CODEX["Codex<br/>~/.codex/config.toml<br/>[mcp_servers.*]"]
     GEMINI["Gemini<br/>~/.gemini/settings.json<br/>mcpServers + mcp.allowed"]
     IFLOW["iFlow<br/>~/.iflow/settings.json<br/>mcpServers"]
-    CLAUDE_FILE["Claude(file)<br/>~/.claude/settings.json<br/>mcpServers"]
+    CLAUDE_FILE["Claude(mirror)<br/>~/.claude/settings.json<br/>mcpServers"]
     CURSOR["Cursor<br/>~/.cursor/mcp.json<br/>mcpServers"]
     VSCODE["VS Code<br/>~/.config/Code/User/mcp.json<br/>servers"]
     DROID["Droid<br/>~/.factory/mcp.json<br/>mcpServers"]
@@ -27,8 +27,9 @@ flowchart TD
   MCP --> VSCODE
   MCP --> DROID
 
-  CLAUDE_REG["Claude(register)<br/>register sync (internal)<br/>(~/.claude.json project scope)"]
-  SYNC -. fallback .-> CLAUDE_REG
+  CLAUDE_REG["Claude Code registry<br/>claude mcp add/remove (-s user/local/project)<br/>(~/.claude.json: mcpServers / projects.*.mcpServers)"]
+  SYNC --> CLAUDE_REG
+  MCP --> CLAUDE_REG
 
   RUNTIME[Runtime stdio]
   CODEX --> RUNTIME
