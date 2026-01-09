@@ -12,10 +12,10 @@ from .. import utils as U
 
 
 def _clear_claude_project_overrides(dry_run: bool = False) -> int:
-    """清空 ~/.claude.json 中所有 projects.*.mcpServers（仅 MCP 段）。"""
+    """清空 ~/.claude.json 中所有 projects.*.mcpServers（Claude local scope / 按目录覆盖）。"""
     p = U.HOME / ".claude.json"
     if dry_run:
-        print(f"[DRY-RUN] 将清空 Claude 项目级覆盖: {p} (projects.*.mcpServers)")
+        print(f"[DRY-RUN] 将清空 Claude local scope（按目录）覆盖: {p} (projects.*.mcpServers)")
         return 0
     if not p.exists():
         return 0
@@ -43,7 +43,7 @@ def _clear_claude_project_overrides(dry_run: bool = False) -> int:
 
     U.backup(p)
     p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[OK] 已清空 Claude 项目级覆盖: {p}（{cleared} 个项目）")
+    print(f"[OK] 已清空 Claude local scope（按目录）覆盖: {p}（{cleared} 个目录）")
     return 0
 
 
@@ -80,7 +80,12 @@ def _clear_claude_registry(verbose: bool = False, dry_run: bool = False):
         names = sorted(U.claude_user_mcp_servers())
     else:
         try:
-            out = subprocess.run(["claude", "mcp", "list"], capture_output=True, text=True, timeout=30)
+            out = subprocess.run(
+                ["claude", "mcp", "list"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
             text = (out.stdout or "") + "\n" + (out.stderr or "")
             names = []
             for line in text.splitlines():
@@ -119,7 +124,7 @@ def _preview(targets: list[str], dry_run: bool) -> None:
         if t == "claude":
             print(
                 f'  - Claude 文件: {U.HOME/".claude"/"settings.json"}; '
-                f'项目覆盖: {U.HOME/".claude.json"} (projects.*.mcpServers); '
+                f'local scope 覆盖: {U.HOME/".claude.json"} (projects.*.mcpServers); '
                 "注册表: claude mcp remove *"
             )
         elif t == "codex":

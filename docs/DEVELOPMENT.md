@@ -26,6 +26,7 @@ pip install -r requirements-dev.txt   # 包含 pytest / ruff / black / jsonschem
 
 快速检查：
 
+bash scripts/qa.sh       # 本地质检入口（ruff/black/pytest/验证脚本/CLI 冒烟）
 bash scripts/format.sh   # 仅格式化 mcp_cli
 bash scripts/lint.sh     # 仅 lint mcp_cli
 pytest -q                # 全量测试（tests/conftest.py 已隔离 HOME）
@@ -46,6 +47,7 @@ pytest -q                # 全量测试（tests/conftest.py 已隔离 HOME）
 
 ## 贡献约定
 
+- 提交前请至少运行 bash scripts/qa.sh（本仓库默认不依赖线上 CI）。
 - 仅变更 mcp_cli/ 时，请运行 bash scripts/format.sh && bash scripts/lint.sh。
 - 新增命令：在 mcp_cli/commands/<name>.py 实现并在 bin/mcp 中分发。
 - 引入外部命令时，务必为 DRY-RUN 分支提供“预览命令输出”。

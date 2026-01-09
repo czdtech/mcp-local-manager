@@ -82,7 +82,7 @@ mcp check
   - 关键点：
     - 未带 `--client` 时：交互选择要清理的客户端（空行=全部）。
     - 带 `--client` 时：只针对指定客户端清理；如提供了未知客户端名称，会报错并不做任何修改（不会“退回到全部清理”）。
-    - Claude 额外清理：会同时清空 `~/.claude.json` 中所有 `projects.*.mcpServers`（项目级覆盖），避免“清不干净”的错觉。
+    - Claude 额外清理：会同时清空 `~/.claude.json` 中所有 `projects.*.mcpServers`（local scope / 按目录），避免“清不干净”的错觉。
     - 单槽备份 `.backup`，可用 `mcp undo` 回滚。
 
 - localize

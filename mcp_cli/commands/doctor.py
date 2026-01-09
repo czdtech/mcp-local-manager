@@ -101,7 +101,7 @@ def _make_suggested_onboard_preset(target: str) -> str:
 
 
 def _claude_project_overrides() -> tuple[dict[str, list[str]], Path]:
-    """读取 ~/.claude.json projects.*.mcpServers（项目级覆盖）。"""
+    """读取 ~/.claude.json projects.*.mcpServers（Claude local scope / 按目录配置）。"""
     p = U.HOME / ".claude.json"
     obj = U.load_json(p, {}, "")
     if not isinstance(obj, dict):
@@ -215,17 +215,21 @@ def run(args) -> int:
         if key == "claude-reg" and claude_overrides:
             status = "warn" if status == "passed" else status
             notes.append(
-                f"检测到 Claude 项目级覆盖: {claude_overrides_path} "
-                f"projects.*.mcpServers 非空（{len(claude_overrides)} 个项目）"
+                f"检测到 Claude local scope（按目录）配置: {claude_overrides_path} "
+                f"projects.*.mcpServers 非空（{len(claude_overrides)} 个目录）"
+            )
+            notes.append(
+                "说明：这是 Claude 的 local scope（默认 scope）配置；"
+                "仅当你期望纯 user scope（全局）时才需要清理。"
             )
             if verbose:
                 for proj, servers in list(claude_overrides.items())[:3]:
                     notes.append(f"override[{proj}]=" + ", ".join(servers))
                 if len(claude_overrides) > 3:
-                    notes.append(f"… 还有 {len(claude_overrides) - 3} 个项目")
+                    notes.append(f"… 还有 {len(claude_overrides) - 3} 个目录")
             suggestions.append(
-                "建议：mcp clear --client claude --dry-run 先预览，"
-                "再用 --yes 清空项目覆盖并移除注册表条目"
+                "如需清理 local scope（按目录）覆盖："
+                "请手动删除 ~/.claude.json 中 projects.*.mcpServers（保留其它字段）。"
             )
 
         if verbose:

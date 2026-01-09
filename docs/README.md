@@ -7,6 +7,8 @@
 
 面向贡献者：
 - `docs/DEVELOPMENT.md`：开发指南与测试/格式化约定
+- `CONTRIBUTING.md`：贡献指南（如何提 PR / 本地质检）
+- `docs/RELEASE.md`：发版指南（维护者）
 - `docs/RENDER_DIAGRAMS.md`：架构图渲染说明（Mermaid/PlantUML）
 - `docs/mcp-architecture.png`：架构图（图）
 - `docs/mcp-architecture.mmd` / `docs/mcp-architecture.puml`：架构图源文件

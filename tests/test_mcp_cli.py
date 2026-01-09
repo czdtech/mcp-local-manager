@@ -306,7 +306,7 @@ class TestMCPIClear:
         assert '确认' not in result.stdout
     
     def test_clear_claude_project_overrides(self):
-        """Claude 项目级覆盖（~/.claude.json projects.*.mcpServers）应被清空且保留其它字段。"""
+        """Claude local scope（按目录配置，~/.claude.json projects.*.mcpServers）应被清空且保留其它字段。"""
         env = self._env()
         p = Path(self.tmp_home) / '.claude.json'
         p.write_text(

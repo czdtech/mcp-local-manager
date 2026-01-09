@@ -155,7 +155,9 @@ def _codex_keys() -> set[str]:
 def _claude_registered() -> set[str]:
     """读取 Claude Code MCP 注册表中的 server 名称集合。
 
-    - 当 scope=user 时，优先直接读取 ~/.claude.json 顶层 mcpServers（更快且不受 `claude mcp list` 变慢影响）。
+    - 当 scope=user 时，优先直接读取 ~/.claude/settings.json 的 mcpServers，
+      并兼容旧版 ~/.claude.json。
+      （更快且不受 `claude mcp list` 变慢影响）。
     - 其它 scope 回退到 `claude mcp list` 解析输出。
     """
 
@@ -201,10 +203,21 @@ def claude_registry_scope() -> str:
 
 
 def claude_user_mcp_servers() -> set[str]:
-    """从 ~/.claude.json 顶层 mcpServers 读取 user scope 下的 server 名称集合。"""
+    """读取 Claude Code user scope 下的 server 名称集合。
 
+    优先读取官方 settings 文件：`~/.claude/settings.json` 的 `mcpServers`；
+    若为空或不存在，则回退读取旧版：`~/.claude.json` 顶层 `mcpServers`。
+    """
+
+    # 1) 新版/官方 settings 文件
+    p = HOME / ".claude" / "settings.json"
+    obj = load_json(p, {}, "Claude user 配置读取（settings.json）")
+    if isinstance(obj, dict) and isinstance(obj.get("mcpServers"), dict) and obj["mcpServers"]:
+        return set(obj["mcpServers"].keys())
+
+    # 2) 旧版/兼容路径
     p = HOME / ".claude.json"
-    obj = load_json(p, {}, "Claude user 配置读取")
+    obj = load_json(p, {}, "Claude user 配置读取（.claude.json）")
     if isinstance(obj, dict) and isinstance(obj.get("mcpServers"), dict):
         return set(obj["mcpServers"].keys())
     return set()
@@ -352,7 +365,8 @@ def to_target_server_info(info: dict[str, Any], client: str | None = None) -> di
         - Cursor 文档示例使用 `local` 表示本地进程（stdio）。
         - Claude / VS Code 文档示例使用 `stdio`。
         """
-        # 仅在 central 显式提供 type 时才做映射；否则保持“不写 type”（避免误把远端/SSE 配置写成 stdio/local）。
+        # 仅在 central 显式提供 type 时才做映射；否则保持“不写 type”。
+        # （避免误把远端/SSE 配置写成 stdio/local）
         if server_type is None:
             return None
         t = str(server_type).strip().lower()
@@ -367,7 +381,14 @@ def to_target_server_info(info: dict[str, Any], client: str | None = None) -> di
             return t
 
         # Claude / VS Code：优先写 stdio；若 central 写了 local，也做兼容映射
-        if c in ("claude", "claude-file", "claude-reg", "vscode-user", "vscode-insiders", "vscode-ins"):
+        if c in (
+            "claude",
+            "claude-file",
+            "claude-reg",
+            "vscode-user",
+            "vscode-insiders",
+            "vscode-ins",
+        ):
             if t == "local":
                 return "stdio"
             return t

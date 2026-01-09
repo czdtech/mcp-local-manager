@@ -346,7 +346,12 @@ def apply_claude(subset: dict, verbose: bool = False, dry_run: bool = False) -> 
         present = sorted(U.claude_user_mcp_servers())
     else:
         try:
-            out = subprocess.run(["claude", "mcp", "list"], capture_output=True, text=True, timeout=10)
+            out = subprocess.run(
+                ["claude", "mcp", "list"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             text = (out.stdout or "") + "\n" + (out.stderr or "")
             present = []
             for line in text.splitlines():

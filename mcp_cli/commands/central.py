@@ -167,28 +167,27 @@ def _validate(obj: dict[str, Any]) -> tuple[bool, str]:
             if not isinstance(overrides, dict):
                 return False, f"服务器 '{name}' 的 'client_overrides' 必须是对象"
             for client, override in overrides.items():
+                base = f"服务器 '{name}' 的 client_overrides.{client}"
                 if not isinstance(override, dict):
-                    return False, f"服务器 '{name}' 的 client_overrides.{client} 必须是对象"
+                    return False, f"{base} 必须是对象"
                 if "command" in override:
                     v = override.get("command")
                     if not isinstance(v, str) or not v.strip():
-                        return False, f"服务器 '{name}' 的 client_overrides.{client}.command 必须是非空字符串"
+                        return False, f"{base}.command 必须是非空字符串"
                 if "args" in override:
                     args = override.get("args")
                     if not isinstance(args, list):
-                        return False, f"服务器 '{name}' 的 client_overrides.{client}.args 必须是数组"
+                        return False, f"{base}.args 必须是数组"
                     for i, arg in enumerate(args):
                         if not isinstance(arg, str):
-                            return False, f"服务器 '{name}' 的 client_overrides.{client}.args[{i}] 必须是字符串"
+                            return False, f"{base}.args[{i}] 必须是字符串"
                 if "env" in override:
                     env = override.get("env")
                     if not isinstance(env, dict):
-                        return False, f"服务器 '{name}' 的 client_overrides.{client}.env 必须是对象"
+                        return False, f"{base}.env 必须是对象"
                     for k, v in env.items():
                         if not isinstance(v, str):
-                            return False, (
-                                f"服务器 '{name}' 的 client_overrides.{client} 环境变量 '{k}' 必须是字符串"
-                            )
+                            return False, f"{base} 环境变量 '{k}' 必须是字符串"
 
     # 3) 若 jsonschema 可用，则执行完整 schema 校验（更精确的类型/范围校验）
     # 注意：mcp_validation 在 CLI 场景可用（bin 目录），但库/测试环境不一定可 import。
@@ -197,7 +196,8 @@ def _validate(obj: dict[str, Any]) -> tuple[bool, str]:
         try:
             import jsonschema
         except ImportError:
-            # jsonschema 不可用：上面的手工校验已覆盖 schema 的关键约束，避免“静默跳过导致写入脏配置”。
+            # jsonschema 不可用：上面的手工校验已覆盖 schema 的关键约束，
+            # 避免“静默跳过导致写入脏配置”。
             pass
         else:
             try:

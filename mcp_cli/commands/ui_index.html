@@ -365,8 +365,8 @@ function renderRows(central, target) {
   }
   if (target.claude_project_overrides && target.claude_project_overrides.count > 0) {
     warn.push(
-      `Claude 检测到项目级覆盖（~/.claude.json projects.*.mcpServers 非空）：`
-        + `${target.claude_project_overrides.count} 个项目。`
+      `Claude 检测到 local scope（按目录）配置（~/.claude.json projects.*.mcpServers 非空）：`
+        + `${target.claude_project_overrides.count} 个目录。`
     );
   }
   $("warnBox").textContent = warn.length ? warn.map(s => `- ${s}`).join("\n") : "（无）";

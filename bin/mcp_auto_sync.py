@@ -331,7 +331,21 @@ def _claude_scope() -> str:
 
 def _claude_user_mcp_servers() -> set[str]:
     # 避免模块级 HOME 常量在测试/子进程中被提前绑定；这里动态读取 Path.home()
-    p = Path.home() / ".claude.json"
+    home = Path.home()
+
+    # 1) 优先读取官方 settings 文件：~/.claude/settings.json
+    p = home / ".claude" / "settings.json"
+    if p.exists():
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            obj = None
+        m = obj.get("mcpServers") if isinstance(obj, dict) else None
+        if isinstance(m, dict) and m:
+            return set(m.keys())
+
+    # 2) 兼容旧版：~/.claude.json
+    p = home / ".claude.json"
     if not p.exists():
         return set()
     try:

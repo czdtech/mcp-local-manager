@@ -3,7 +3,7 @@ set -euo pipefail
 
 # 目标：一键为新人完成“最小落地”
 # - 仅 Cursor 启用：context7 + task-master-ai
-# - 其它 CLI/IDE 全部裸奔（清空文件端、注册表与项目级覆盖）
+# - 其它 CLI/IDE 全部裸奔（清空文件端、注册表与 local scope（按目录）配置）
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="$HOME/.local/bin:$PATH"

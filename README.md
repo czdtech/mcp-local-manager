@@ -55,7 +55,10 @@ mcp status cursor
 
 - **统一来源**：\`~/.mcp-central/config/mcp-servers.json\`
 - **仅改 MCP 段**：不同目标只写入各自 MCP 部分（如 Codex 的 \`[mcp_servers.*]\`、Gemini 的 \`mcpServers\` 等），不触碰其它设置
-- **Claude Code**：注册表为主（\`claude mcp add/remove -s user\` 写入 \`~/.claude.json\` 顶层 \`mcpServers\`）；同时镜像写入 \`~/.claude/settings.json\` 的 \`mcpServers\`
+- **Claude Code**：官方支持 \`--scope local|project|user\`（默认 \`local\`）
+  - \`user\`：全局稳定（推荐）。配置主要在 \`~/.claude/settings.json\` 的 \`mcpServers\`（并兼容旧版 \`~/.claude.json\`）。
+  - \`local\`：按目录生效。配置在 \`~/.claude.json\` 的 \`projects.<path>.mcpServers\`。
+  - \`project\`：团队共享。配置在仓库根目录 \`.mcp.json\`。
 - **默认全部启用**：清单里未显式写 \`enabled: false\` 的服务都视为启用；是否真正"加载"，由你对某个 CLI/IDE 的落地选择决定
   - 行为约束：\`mcp run\` 仅允许下发“已启用”的服务；\`enabled: false\` 的条目会被跳过/拒绝（需先在 central 启用）
   - 状态基线：\`mcp status\` 的 on/off 以“已启用”集合为基线；若目标端仍配置了 central 已禁用的服务，会提示告警
@@ -134,7 +137,10 @@ mcp --help
 - **Codex**: \`~/.codex/config.toml\` - 仅 \`[mcp_servers.*]\` 与 \`*.env\`
 - **Gemini**: \`~/.gemini/settings.json\` - 仅 \`mcpServers\` + \`mcp.allowed\`
 - **iFlow**: \`~/.iflow/settings.json\` - 仅 \`mcpServers\`
-- **Claude Code**: \`~/.claude.json\` - 通过 \`claude mcp add/remove -s user\` 落地（全局）；同时镜像写入 \`~/.claude/settings.json\` 的 \`mcpServers\`
+- **Claude Code**:
+  - \`~/.claude/settings.json\` - 仅 \`mcpServers\`（user scope，全局稳定，推荐）
+  - \`~/.claude.json\` - 仅 \`projects.*.mcpServers\`（local scope / 按目录；用于检测/清理漂移时）
+  - \`.mcp.json\`（项目根目录）- project scope（团队共享；由 Claude Code 自行读取，本工具不自动生成）
 - **Droid**: \`~/.factory/mcp.json\` - 仅 \`mcpServers\`；在 `mcp run` 的交互中选择 Droid 后，会对所选集合执行“remove → add”强制对齐注册表。
 - **Cursor**: \`~/.cursor/mcp.json\` - 仅 \`mcpServers\`
 - **VS Code**: CLI 会按平台自动选择路径：
@@ -208,17 +214,40 @@ python3 bin/mcp_validation.py config/mcp-servers.sample.json
 ### 开发测试
 
 ```bash
-# 安装开发依赖
-pip install -r requirements-dev.txt
+# 首次（推荐）：自动创建 .venv 并安装开发依赖 + 跑一遍质检
+bash scripts/qa.sh --install
 
-# 运行测试
-pytest -v
+# 日常：全量质检（ruff/black/pytest/配置验证/CLI 冒烟）
+bash scripts/qa.sh
 
-# 运行特定测试
-pytest tests/test_validation.py -v
+# 更快：跳过 pytest
+bash scripts/qa.sh --fast
+
+# 自动修复（会改动代码）
+bash scripts/qa.sh --fix
 ```
 
-注意：本项目已提供最小 GitHub Actions CI（ruff/black/pytest），但仍建议你在本地跑一遍 `pytest -q` 作为最终确认。
+注意：本项目不启用线上 CI，请在本地跑一遍 `bash scripts/qa.sh` 作为最终确认。
+
+## 常规开发流程（稳定优先）
+
+如果你准备给别人使用/开源发布，建议把下面这套流程当作“默认习惯”。
+
+1) **每次改动后（本地质检）**
+- 快速检查：`bash scripts/qa.sh --fast`
+- 完整检查：`bash scripts/qa.sh`
+
+2) **修 Bug 的闭环**
+- 先复现（写清楚复现步骤）→ 再修复 → 补一个最小测试用例防回归 → 跑 `bash scripts/qa.sh`
+
+3) **发版前（维护者）**
+- 按 `docs/RELEASE.md`：跑 `bash scripts/qa.sh` + 冒烟验证（全新目录 clone + `bash scripts/install-mac.sh` + 关键命令）
+- 更新 `CHANGELOG.md`，再打 tag/发布
+
+4) **用户报 Bug 时你要的信息**
+- 让用户提供：`mcp doctor --client <client> --json` 输出 + OS/Python/Node 版本 + 复现步骤
+
+更多细节见：`CONTRIBUTING.md`。
 
 ## 故障排查
 
@@ -381,3 +410,7 @@ bash scripts/render-diagrams.sh
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！
+
+- 贡献指南：`CONTRIBUTING.md`
+- 报 Bug：请附 `mcp doctor --client <client> --json` 输出（可打码）
+- 提 PR：提交前建议运行 `bash scripts/qa.sh`

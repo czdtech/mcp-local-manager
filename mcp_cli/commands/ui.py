@@ -510,7 +510,9 @@ def _codex_render_server_block(name: str, info: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def remove_from_target(client: str, name: str, *, claude_scope: str | None = None) -> dict[str, Any]:
+def remove_from_target(
+    client: str, name: str, *, claude_scope: str | None = None
+) -> dict[str, Any]:
     """从目标端删除某个 server（不会为不存在的配置文件创建空文件）。"""
     name = str(name or "").strip()
     if not name:

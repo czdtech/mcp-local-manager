@@ -5,8 +5,8 @@ MCP Auto Sync (macOS/Linux)
 - Codex:   ~/.codex/config.toml              [mcp_servers.*] + *.env 子表
 - Gemini:  ~/.gemini/settings.json           mcpServers + mcp.allowed
 - iFlow:   ~/.iflow/settings.json            mcpServers
-- Claude Code: ~/.claude.json                mcpServers（user scope，推荐；由 claude mcp add/remove 写入）
-             + ~/.claude/settings.json       mcpServers（文件镜像/兼容）
+- Claude Code: ~/.claude/settings.json       mcpServers（user scope，全局稳定；兼容旧版 ~/.claude.json）
+             + ~/.claude.json                projects.*.mcpServers（local scope / 按目录）
 - Droid:   ~/.factory/mcp.json               mcpServers
 - Cursor:  ~/.cursor/mcp.json                mcpServers
 - VS Code: macOS ~/Library/Application Support/Code*/User/mcp.json 顶层 servers
@@ -400,7 +400,21 @@ def _claude_scope() -> str:
 
 def _claude_user_mcp_servers() -> set[str]:
     # 避免模块级 HOME 常量在测试/子进程中被提前绑定；这里动态读取 Path.home()
-    p = Path.home() / ".claude.json"
+    home = Path.home()
+
+    # 1) 优先读取官方 settings 文件：~/.claude/settings.json
+    p = home / ".claude" / "settings.json"
+    if p.exists():
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            obj = None
+        m = obj.get("mcpServers") if isinstance(obj, dict) else None
+        if isinstance(m, dict) and m:
+            return set(m.keys())
+
+    # 2) 兼容旧版：~/.claude.json
+    p = home / ".claude.json"
     if not p.exists():
         return set()
     try:

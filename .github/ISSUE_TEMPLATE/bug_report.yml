@@ -1,0 +1,108 @@
+name: Bug 报告
+description: 报告一个“能复现”的问题，帮助我们快速定位与修复
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前请先搜索是否已有同类 Issue。
+
+        注意：请勿粘贴任何密钥/Token/账号信息；如输出包含个人路径/项目名可适当打码。
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: 目标客户端 / IDE
+      description: 请选择你遇到问题的目标端
+      options:
+        - Cursor
+        - Claude（文件）
+        - Claude（注册表）
+        - Codex
+        - Gemini
+        - iFlow
+        - Droid
+        - VS Code（User）
+        - VS Code（Insiders）
+        - 其它（请在下方说明）
+    validations:
+      required: true
+
+  - type: input
+    id: project_version
+    attributes:
+      label: 项目版本/提交号
+      description: 建议填写 tag（如 v1.3.10）或 git 提交（如 `git log -1 --oneline`）
+      placeholder: vX.Y.Z 或 commit
+    validations:
+      required: true
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Python 版本
+      placeholder: python3 --version
+    validations:
+      required: true
+
+  - type: input
+    id: node_version
+    attributes:
+      label: Node 版本（如涉及 npx/Node 服务）
+      placeholder: node --version
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 请尽量提供最小可复现步骤（包含你执行的命令）
+      placeholder: |
+        1) ...
+        2) ...
+        3) ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为/报错信息
+      description: 请粘贴完整输出或关键日志（必要时可截图）
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: 诊断输出（必填）
+      description: |
+        请在终端运行并粘贴输出（建议选择你出问题的 client）：
+        - `mcp doctor --client <client> --json`
+        也可补充：`mcp status <client> --central`
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他补充
+      description: 例如：是否是首次安装、是否从旧版本升级、是否使用代理/企业网络等
