@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.11 (2026-01-09)
+
+- Claude Code：user scope 优先读取 `~/.claude/settings.json` 的 `mcpServers`，并兼容旧版 `~/.claude.json`。
+- Doctor/UI/文档：将 `projects.*.mcpServers` 统一表述为 local scope（按目录），减少“项目级覆盖”误解。
+- 维护：新增 `scripts/qa.sh` 本地质检与 `docs/RELEASE.md` 发版指南；补齐 GitHub issue/PR 模板；CI workflow 示例化。
+
 ## v1.3.10 (2026-01-09)
 
 - Central：强化校验并对齐 Augment MCP 落地。
